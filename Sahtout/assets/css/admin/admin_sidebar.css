@@ -1,0 +1,144 @@
+/* Sahtout Admin Sidebar - Premium Noxertez Theme */
+.admin-sidebar {
+    padding-left: 0;
+    padding-right: 0;
+    z-index: 100;
+}
+
+.admin-sidebar-card {
+    background: linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(10, 10, 30, 0.98)) !important;
+    border: 2px solid #d4af37 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 15px rgba(212, 175, 55, 0.2) !important;
+    overflow: hidden;
+    color: #fff !important;
+    margin-bottom: 2rem;
+}
+
+/* Card header */
+.admin-sidebar-header {
+    background: rgba(44, 44, 44, 0.4) !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3) !important;
+    color: #ffd700 !important;
+    font-family: 'Cinzel', serif !important;
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5) !important;
+    padding: 1.25rem 1rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 1px;
+}
+
+.admin-sidebar-header h5 {
+    font-size: 1.1rem;
+    text-transform: uppercase;
+}
+
+/* Admin Menu Container */
+.admin-sidebar-menu {
+    background: transparent !important;
+    padding: 1rem 0.5rem !important;
+}
+
+/* Navigation links */
+.admin-sidebar-nav .nav-link {
+    color: #e0e0e0 !important;
+    background: rgba(255, 255, 255, 0.03);
+    margin: 0.4rem 0.5rem !important;
+    padding: 0.8rem 1rem !important;
+    border-radius: 8px !important;
+    font-family: 'Cinzel', serif !important;
+    font-size: 0.9rem !important;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid transparent !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.admin-sidebar-nav .nav-link i {
+    color: #1b9bf0;
+    width: 20px;
+    text-align: center;
+    font-size: 1.1rem;
+    filter: drop-shadow(0 0 5px rgba(27, 155, 240, 0.4));
+    transition: all 0.3s ease;
+}
+
+.admin-sidebar-nav .nav-link:hover {
+    background: rgba(212, 175, 55, 0.15) !important;
+    color: #ffd700 !important;
+    border-color: rgba(212, 175, 55, 0.4) !important;
+    transform: translateX(8px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.admin-sidebar-nav .nav-link:hover i {
+    color: #ffd700;
+    transform: scale(1.2) rotate(5deg);
+}
+
+.admin-sidebar-nav .nav-link.active {
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.05)) !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    border-left: 4px solid #d4af37 !important;
+    border-radius: 4px 12px 12px 4px !important;
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.15) !important;
+}
+
+.admin-sidebar-nav .nav-link.active i {
+    color: #d4af37;
+}
+
+/* Logout link special style */
+.admin-sidebar-nav .nav-link.text-danger {
+    color: #ff6b6b !important;
+    background: rgba(255, 107, 107, 0.05);
+}
+
+.admin-sidebar-nav .nav-link.text-danger:hover {
+    background: rgba(231, 76, 60, 0.2) !important;
+    color: #fff !important;
+    border-color: rgba(231, 76, 60, 0.5) !important;
+}
+
+.admin-sidebar-nav .nav-link.text-danger i {
+    color: #ff6b6b;
+}
+
+/* Separator */
+.admin-sidebar hr {
+    border-color: rgba(212, 175, 55, 0.2) !important;
+    margin: 1.5rem 0.5rem !important;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .admin-sidebar {
+        margin-bottom: 2rem;
+    }
+
+    .mobile-toggle {
+        display: block !important;
+        background: transparent;
+        border: none;
+        color: #d4af37;
+        font-size: 1.3rem;
+        cursor: pointer;
+        padding: 0;
+        transition: transform 0.3s ease;
+    }
+
+    .mobile-toggle:hover {
+        transform: scale(1.1);
+    }
+
+    .admin-sidebar-menu {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.5s ease-in-out;
+    }
+
+    .admin-sidebar-menu.active {
+        max-height: 1000px; /* High enough to contain all items */
+    }
+}

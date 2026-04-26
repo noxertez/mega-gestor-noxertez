@@ -1,0 +1,436 @@
+/* ============================================================
+   MÓDULO FLUJO DE PEDIDOS — Noxertez Artesanía
+   flujo_pedidos.css
+   ============================================================ */
+
+/* ── LAYOUT PRINCIPAL ──────────────────────────────────────── */
+.flujo-app {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 70px);
+    background: #0a0f1e;
+    color: #e2e8f0;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    overflow: hidden;
+}
+
+/* ── BARRA SUPERIOR ────────────────────────────────────────── */
+.flujo-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: rgba(15,23,42,0.95);
+    border-bottom: 1px solid #1e3a5f;
+    backdrop-filter: blur(10px);
+    gap: 16px;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+.flujo-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.flujo-topbar h1 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #C89B3C;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.flujo-topbar h1 i { margin-right: 8px; }
+
+.flujo-select {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+    min-width: 280px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.flujo-select:focus { outline: none; border-color: #C89B3C; }
+
+.flujo-topbar-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* ── BOTONES FLUJO ─────────────────────────────────────────── */
+.flujo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.flujo-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+.flujo-btn-blue   { background: #2563eb; color: #fff; }
+.flujo-btn-amber  { background: #d97706; color: #fff; }
+.flujo-btn-green  { background: #059669; color: #fff; }
+.flujo-btn-red    { background: #dc2626; color: #fff; }
+.flujo-btn-gray   { background: #374151; color: #e2e8f0; }
+.flujo-btn-icon   { background: transparent; border: none; cursor: pointer; color: #94a3b8; font-size: 1.1rem; padding: 4px 8px; }
+.flujo-btn-icon:hover { color: #e2e8f0; }
+
+/* ── TIMELINE BAR ──────────────────────────────────────────── */
+.flujo-timeline-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 8px 24px;
+    background: rgba(30,41,59,0.8);
+    border-bottom: 1px solid #1e293b;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+/* ── CUERPO (CANVAS + PANEL) ───────────────────────────────── */
+.flujo-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.flujo-canvas-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+#drawflowCanvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* ── DRAWFLOW OVERRIDES ────────────────────────────────────── */
+.drawflow {
+    background-color: #0d1628 !important;
+    background-image:
+        radial-gradient(circle, #1e293b 1px, transparent 1px) !important;
+    background-size: 32px 32px !important;
+}
+
+.drawflow .drawflow-node {
+    background: #1a2742 !important;
+    border: 1px solid #2d3f5e !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
+    padding: 0 !important;
+    min-width: 190px !important;
+    width: 190px !important;
+    transition: box-shadow 0.2s, border-color 0.2s !important;
+}
+
+.drawflow .drawflow-node:hover {
+    border-color: #C89B3C !important;
+    box-shadow: 0 0 20px rgba(200,155,60,0.3) !important;
+}
+
+/* Estado del nodo → borde superior coloreado */
+.drawflow .drawflow-node.flujo-nodo-completado  { border-top: 4px solid #10b981 !important; background: rgba(16,185,129,0.1) !important; }
+.drawflow .drawflow-node.flujo-nodo-en_curso    { border-top: 4px solid #3b82f6 !important; }
+.drawflow .drawflow-node.flujo-nodo-pendiente   { border-top: 4px solid #475569 !important; }
+.drawflow .drawflow-node.flujo-nodo-bloqueado   { border-top: 4px solid #ef4444 !important; background: rgba(239,68,68,0.1) !important; }
+.drawflow .drawflow-node.flujo-nodo-incidencia  { box-shadow: 0 0 20px rgba(239,68,68,0.4) !important; }
+.drawflow .drawflow-node.flujo-nodo-tipo-incidencia { border-style: dashed !important; border-color: #ef4444 !important; }
+
+/* Connexiones */
+.drawflow svg .drawflow-connection path { stroke: #3b82f6 !important; stroke-width: 2px !important; }
+.drawflow svg .drawflow-connection.flujo-nodo-incidencia path { stroke: #ef4444 !important; stroke-dasharray: 5,5 !important; }
+
+/* Puntos de entrada/salida */
+.drawflow .input, .drawflow .output {
+    background: #2d3f5e !important;
+    border: 2px solid #3b82f6 !important;
+    width: 14px !important;
+    height: 14px !important;
+    top: 50% !important;
+}
+
+/* ── NODO INTERIOR ─────────────────────────────────────────── */
+.nodo-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px 6px;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+}
+
+.nodo-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.nodo-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.nodo-nombre {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.nodo-tiempo {
+    font-size: 0.7rem;
+    color: #64748b;
+    display: block;
+    margin-top: 2px;
+}
+
+.nodo-inc-badge {
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 1px 4px;
+    border-radius: 4px;
+    margin-left: 4px;
+}
+
+/* Barra de progreso dentro del nodo */
+.nodo-progress {
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+.nodo-progress-bar {
+    height: 100%;
+    border-radius: 0 0 12px 12px;
+    transition: width 0.6s ease;
+}
+
+/* ── BADGES ────────────────────────────────────────────────── */
+.nodo-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    margin-top: 3px;
+}
+
+.badge-gray   { background: #334155; color: #94a3b8; }
+.badge-blue   { background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+.badge-green  { background: rgba(16,185,129,0.2); color: #34d399; border: 1px solid #10b981; }
+.badge-red    { background: rgba(239,68,68,0.2);  color: #f87171; border: 1px solid #ef4444; }
+.badge-amber  { background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+
+/* ── PANEL LATERAL ─────────────────────────────────────────── */
+.flujo-panel-lateral {
+    width: 0;
+    overflow: hidden;
+    background: #0f1c34;
+    border-left: 1px solid #1e293b;
+    transition: width 0.3s ease;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.flujo-panel-lateral.open {
+    width: 320px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #1e293b;
+    flex-shrink: 0;
+}
+
+.panel-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #C89B3C;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.panel-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.panel-section label {
+    font-size: 0.75rem;
+    color: #C89B3C;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.nodo-stat {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+
+/* ── ESTADO VACÍO ──────────────────────────────────────────── */
+.flujo-empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: #334155;
+    text-align: center;
+    pointer-events: none;
+}
+.flujo-empty-state i { color: #1e3a5f; }
+.flujo-empty-state p { color: #475569; font-size: 1rem; margin: 0; }
+.flujo-empty-state .flujo-btn { pointer-events: all; }
+
+/* ── CANAL BADGES ──────────────────────────────────────────── */
+.canal-badge {
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.canal-whatsapp  { background: rgba(37,211,102,0.2); color: #25d366; border: 1px solid #25d366; }
+.canal-trendioff { background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid #3b82f6; }
+.canal-directo   { background: rgba(148,163,184,0.2); color: #94a3b8; border: 1px solid #475569; }
+
+/* ── VISTA MULTI-PEDIDO ────────────────────────────────────── */
+.multi-card {
+    background: #1a2742;
+    border: 1px solid #2d3f5e;
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.multi-card:hover { border-color: #C89B3C; transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.4); }
+.multi-card-bloqueado { border-color: rgba(239,68,68,0.5); animation: pulse-red 2s infinite; }
+
+@keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); }
+    50%       { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+}
+
+.multi-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-left: 6px;
+}
+
+.multi-card-id { font-size: 0.75rem; color: #64748b; font-weight: 600; }
+
+.multi-card-cliente {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.multi-card-estado {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    margin-bottom: 8px;
+}
+
+.multi-card-progress-wrap {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.multi-card-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.multi-card-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+/* ── ANALÍTICA ─────────────────────────────────────────────── */
+.analitica-card {
+    background: #1a2742;
+    border: 1px solid #2d3f5e;
+    border-radius: 8px;
+    padding: 12px;
+    transition: border-color 0.2s;
+}
+.analitica-card.analitica-bloqueado { border-color: rgba(239,68,68,0.5); }
+
+.analitica-stat {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+/* ── RESPONSIVE ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .flujo-topbar { flex-direction: column; align-items: flex-start; }
+    .flujo-topbar-right { flex-wrap: wrap; }
+    .flujo-select { min-width: auto; width: 100%; }
+    .flujo-panel-lateral.open { width: 100%; }
+}

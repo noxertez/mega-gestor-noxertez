@@ -1,0 +1,156 @@
+{
+  "name": "05 - Asistente por Voz (Web Speech API)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "asistente",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook Asistente",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "notes": "Tu app manda aquí el texto transcrito por el micrófono del navegador (Web Speech API). Ej: { texto: 'faltan tornillos M6' }"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Interpretar comando de voz transcrito por el navegador\nconst body = $input.first().json;\nconst texto = (body.texto || '').toLowerCase().trim();\n\nif (!texto) return [{ json: { accion: 'error', respuesta: 'No entendí el comando', datos: null } }];\n\nif (texto.match(/falt[ao]|anot[ao]|apunt[ao]|necesito|pide|pedir|añade|añadir|agreg/)) {\n  const limpio = texto\n    .replace(/falta[n]?|anota|apunta|necesito|pide|pedir|añade|añadir|agrega|que|me|:/gi, '')\n    .replace(/\\s+/g, ' ').trim();\n  return [{ json: { accion: 'anotar_faltante', articulo: limpio, respuesta: `Anotado: falta ${limpio}`, datos: { articulo: limpio } } }];\n}\n\nif (texto.match(/qué hay que hacer|tareas|pendiente|qué tengo|hoy que|hacer hoy/)) {\n  return [{ json: { accion: 'consultar_tareas', respuesta: 'Consultando tus tareas...', datos: null } }];\n}\n\nif (texto.match(/pedido|pedidos|cuántos hay|preparar/)) {\n  return [{ json: { accion: 'consultar_pedidos', respuesta: 'Consultando pedidos pendientes...', datos: null } }];\n}\n\nif (texto.match(/cuánto[s]?|stock|quedan|hay de|tengo de/)) {\n  const articulo = texto.replace(/cuántos?|stock|quedan|hay de|tengo de|me/gi, '').replace(/\\s+/g, ' ').trim();\n  return [{ json: { accion: 'consultar_stock', articulo, respuesta: `Consultando stock de ${articulo}...`, datos: { articulo } } }];\n}\n\nif (texto.match(/resumen|cómo ha ido|ventas|hoy|día/)) {\n  return [{ json: { accion: 'resumen_dia', respuesta: 'Preparando el resumen de hoy...', datos: null } }];\n}\n\nreturn [{ json: { accion: 'no_entendido', respuesta: `No reconocí el comando: \"${body.texto}\". Puedes decir: qué hay que hacer, pedidos pendientes, stock de X, o anotar que falta X.`, datos: null } }];"
+      },
+      "id": "node-interpretar",
+      "name": "Interpretar comando de voz",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "anotar_faltante", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "anotar" },
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "consultar_tareas", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "tareas" },
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "consultar_pedidos", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "pedidos" },
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "consultar_stock", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "stock" },
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "resumen_dia", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "resumen" }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "node-switch",
+      "name": "Enrutar por acción",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tareas (descripcion, prioridad, fecha_creacion) VALUES ('FALTA: {{ $('Interpretar comando de voz').first().json.datos.articulo }}', 'alta', NOW())",
+        "options": {}
+      },
+      "id": "node-anotar",
+      "name": "Anotar artículo faltante",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [900, 100],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT descripcion, prioridad, fecha_limite FROM tareas WHERE completada = 0 ORDER BY CASE prioridad WHEN 'alta' THEN 1 WHEN 'media' THEN 2 ELSE 3 END, fecha_limite ASC LIMIT 10",
+        "options": {}
+      },
+      "id": "node-tareas",
+      "name": "Leer tareas pendientes",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [900, 240],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT numero_pedido, nombre_cliente, total FROM pedidos WHERE estado = 'pendiente' ORDER BY fecha_pedido ASC LIMIT 10",
+        "options": {}
+      },
+      "id": "node-pedidos",
+      "name": "Leer pedidos pendientes",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [900, 360],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT SKU_REF as referencia, NOMBRE as nombre, STOCK_FISICO as stock FROM productos WHERE (NOMBRE LIKE '%{{ $('Interpretar comando de voz').first().json.datos.articulo }}%' OR SKU_REF LIKE '%{{ $('Interpretar comando de voz').first().json.datos.articulo }}%') LIMIT 5",
+        "options": {}
+      },
+      "id": "node-stock",
+      "name": "Consultar stock artículo",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [900, 480],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as pedidos, COALESCE(SUM(total),0) as facturado FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'",
+        "options": {}
+      },
+      "id": "node-resumen",
+      "name": "Resumen del día",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [900, 600],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construir respuesta de texto para que el navegador la lea en voz alta\\nconst accion = $('Interpretar comando de voz').first().json.accion;\\nlet respuesta = '';\\n\\nif (accion === 'anotar_faltante') {\\n  const art = $('Interpretar comando de voz').first().json.datos.articulo;\\n  respuesta = `Anotado. He añadido a tus tareas que falta ${art}. Lo verás en la lista de tareas.`;\\n}\\nelse if (accion === 'consultar_tareas') {\\n  const tareas = $input.all();\\n  if (tareas.length === 0) {\\n    respuesta = 'No tienes tareas pendientes. Todo al día!';\\n  } else {\\n    const lista = tareas.map(t => t.json.descripcion).join('. ');\\n    respuesta = `Tienes ${tareas.length} tarea${tareas.length > 1 ? 's' : ''} pendiente${tareas.length > 1 ? 's' : ''}. ${lista}.`;\\n  }\\n}\\nelse if (accion === 'consultar_pedidos') {\\n  const pedidos = $input.all();\\n  if (pedidos.length === 0) {\\n    respuesta = 'No tienes pedidos pendientes. Estás al día!';\\n  } else {\\n    respuesta = `Tienes ${pedidos.length} pedido${pedidos.length > 1 ? 's' : ''} pendiente${pedidos.length > 1 ? 's' : ''} de preparar.`;\\n    if (pedidos.length <= 3) {\\n      const lista = pedidos.map(p => `el de ${p.json.nombre_cliente}`).join(', ');\\n      respuesta += ` Son: ${lista}.`;\\n    }\\n  }\\n}\\nelse if (accion === 'consultar_stock') {\\n  const items = $input.all();\\n  if (items.length === 0) {\\n    const art = $('Interpretar comando de voz').first().json.datos.articulo;\\n    respuesta = `No encontré ningún artículo con el nombre ${art} en tu base de datos.`;\\n  } else {\\n    const lista = items.map(i => `${i.json.nombre}: ${i.json.stock} unidades`).join('. ');\\n    respuesta = lista + '.';\\n  }\\n}\\nelse if (accion === 'resumen_dia') {\\n  const stats = $input.first().json;\\n  const pedidos = stats.pedidos || 0;\\n  const facturado = (stats.facturado || 0).toFixed(2);\\n  if (pedidos === 0) {\\n    respuesta = 'Hoy no hay pedidos registrados todavía.';\\n  } else {\\n    respuesta = `Hoy llevas ${pedidos} pedido${pedidos > 1 ? 's' : ''} y has facturado ${facturado} euros.`;\\n  }\\n}\\nelse {\\n  respuesta = $('Interpretar comando de voz').first().json.respuesta;\\n}\\n\\nreturn [{ json: { respuesta, accion } }];"
+      },
+      "id": "node-construir-respuesta",
+      "name": "Construir respuesta de voz",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 380]
+    },
+    {
+      "parameters": {
+        "respondWith": "allEntries"
+      },
+      "id": "node-responder",
+      "name": "Devolver respuesta a la app",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1360, 380],
+      "notes": "La app recibe 'respuesta' y usa window.speechSynthesis para leerla en voz alta"
+    }
+  ],
+  "connections": {
+    "Webhook Asistente": { "main": [[{ "node": "Interpretar comando de voz", "type": "main", "index": 0 }]] },
+    "Interpretar comando de voz": { "main": [[{ "node": "Enrutar por acción", "type": "main", "index": 0 }]] },
+    "Enrutar por acción": {
+      "main": [
+        [{ "node": "Anotar artículo faltante", "type": "main", "index": 0 }],
+        [{ "node": "Leer tareas pendientes", "type": "main", "index": 0 }],
+        [{ "node": "Leer pedidos pendientes", "type": "main", "index": 0 }],
+        [{ "node": "Consultar stock artículo", "type": "main", "index": 0 }],
+        [{ "node": "Resumen del día", "type": "main", "index": 0 }],
+        [{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]
+      ]
+    },
+    "Anotar artículo faltante": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Leer tareas pendientes": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Leer pedidos pendientes": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Consultar stock artículo": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Resumen del día": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Construir respuesta de voz": { "main": [[{ "node": "Devolver respuesta a la app", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["asistente", "voz", "noxertez"]
+}

@@ -1,0 +1,118 @@
+{
+  "name": "06 - Correo de Cliente a Pedido (IMAP)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "mailbox": "INBOX",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "postProcessAction": "read"
+      },
+      "id": "node-imap-trigger",
+      "name": "Nuevo Correo (IMAP)",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $input.first().json;\n\nconst de = email.from || '';\nconst nombre = de.includes('<') ? de.split('<')[0].trim() : de.split('@')[0];\nconst asunto = (email.subject || '').toLowerCase();\nconst cuerpoRaw = email.text || email.html || email.snippet || '';\nconst cuerpo = cuerpoRaw.toLowerCase();\n\n// Detectar si parece un pedido\nconst esPedido = asunto.match(/pedido|compra|quiero|pedir|encargar|encargo|solicitud|order/) ||\n                  cuerpo.match(/quiero|quisiera|necesito|pedido|pedir|comprar|encargar|cantidad|unidades|unidad/);\n\nif (!esPedido) {\n  return [{ json: { es_pedido: false, de, asunto, nombre } }];\n}\n\n// Extraer artículos\nconst lineas = cuerpoRaw.split(/\\n|,|;/);\nconst items = [];\n\nfor (const linea of lineas) {\n  const l = linea.trim();\n  if (!l) continue;\n  const m1 = l.match(/(\\d+)\\s*(?:unidades?|uds?|x|de)\\s+(.+)/i);\n  if (m1) { items.push({ nombre: m1[2].trim(), cantidad: parseInt(m1[1]), precio: 0 }); continue; }\n  const m2 = l.match(/(.+?)\\s*\\(?[xX](\\d+)\\)?/);\n  if (m2) { items.push({ nombre: m2[1].trim(), cantidad: parseInt(m2[2]), precio: 0 }); continue; }\n  if (l.match(/portavela|vela|jabon|difusor|cesta|caja|pack|set|kit|figura|decoracion|adorno/i)) {\n    items.push({ nombre: l.replace(/[-•*]/g, '').trim(), cantidad: 1, precio: 0 });\n  }\n}\n\nif (items.length === 0) {\n  items.push({ nombre: email.subject || 'Ver correo', cantidad: 1, precio: 0 });\n}\n\nconst telefonoMatch = cuerpoRaw.match(/(?:\\+34|0034)?\\s*[6789]\\d{8}/);\nconst telefono = telefonoMatch ? telefonoMatch[0].replace(/\\s/g, '') : '';\nconst numero_pedido = 'EMAIL-' + Date.now();\n\nreturn [{ json: {\n  es_pedido: true,\n  numero_pedido,\n  nombre_cliente: nombre,\n  email_cliente: de,\n  telefono,\n  asunto: email.subject || '',\n  items_json: JSON.stringify(items),\n  notas: 'Correo: ' + (email.subject || '') + ' | De: ' + de + ' | ' + cuerpoRaw.substring(0, 300),\n  fecha_pedido: new Date().toISOString().slice(0, 19).replace('T', ' ')\n}}];\n"
+      },
+      "id": "node-parser",
+      "name": "Parsear Correo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.es_pedido }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "node-es-pedido",
+      "name": "Es pedido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pedidos (numero_pedido, nombre_cliente, telefono, items_json, total, estado, canal, notas, fecha_pedido) VALUES ('{{ $json.numero_pedido }}', '{{ $json.nombre_cliente }}', '{{ $json.telefono }}', '{{ $json.items_json }}', 0, 'pendiente', 'email', '{{ $json.notas }}', '{{ $json.fecha_pedido }}')",
+        "options": {}
+      },
+      "id": "node-guardar",
+      "name": "Guardar Pedido MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [880, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('pedido_email', CONCAT('Pedido email de ', '{{ $json.nombre_cliente }}', ': ', '{{ $json.asunto }}'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif",
+      "name": "Notificacion MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noxertez@gmail.com",
+        "toEmail": "noxertez@gmail.com",
+        "subject": "=✅ Nuevo pedido email: {{ $('Parsear Correo').first().json.numero_pedido }}",
+        "emailType": "html",
+        "message": "=<h2>Nuevo pedido por correo</h2><p><b>De:</b> {{ $('Parsear Correo').first().json.nombre_cliente }} ({{ $('Parsear Correo').first().json.email_cliente }})</p><p><b>Articulos:</b></p><pre>{{ $('Parsear Correo').first().json.items_json }}</pre><p><a href='https://noxertez.com/noxertez/pages/pedidos.php'>Ver pedidos en el CMS</a></p>",
+        "options": {}
+      },
+      "id": "node-aviso",
+      "name": "Avisarte por Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1100, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ignorado: true } }];"
+      },
+      "id": "node-ignorar",
+      "name": "Ignorar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 420]
+    }
+  ],
+  "connections": {
+    "Nuevo Correo (IMAP)": { "main": [[{ "node": "Parsear Correo", "type": "main", "index": 0 }]] },
+    "Parsear Correo": { "main": [[{ "node": "Es pedido?", "type": "main", "index": 0 }]] },
+    "Es pedido?": {
+      "main": [
+        [{ "node": "Guardar Pedido MySQL", "type": "main", "index": 0 }],
+        [{ "node": "Ignorar", "type": "main", "index": 0 }]
+      ]
+    },
+    "Guardar Pedido MySQL": {
+      "main": [[
+        { "node": "Notificacion MySQL", "type": "main", "index": 0 },
+        { "node": "Avisarte por Email (SMTP)", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["email", "pedidos", "imap", "noxertez"]
+}

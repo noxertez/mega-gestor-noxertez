@@ -1,0 +1,150 @@
+{
+  "name": "04 - Alertas Stock + Resumen Diario",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 9,14,19 * * *" }] }
+      },
+      "id": "node-trigger-stock",
+      "name": "Revisar stock (9h, 14h, 19h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 200]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 20 * * *" }] }
+      },
+      "id": "node-trigger-resumen",
+      "name": "Resumen ventas a las 20h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT SKU_REF as referencia, NOMBRE as nombre, STOCK_FISICO as stock, stock_minimo FROM productos WHERE STOCK_FISICO <= stock_minimo AND alerta_stock_enviada = 0",
+        "options": {}
+      },
+      "id": "node-stock-bajo",
+      "name": "Artículos con stock bajo",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [420, 200],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [{ "leftValue": "={{ $json.referencia }}", "rightValue": "", "operator": { "type": "string", "operation": "notEquals" } }]
+        }
+      },
+      "id": "node-hay-stock",
+      "name": "¿Stock bajo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet alerta = 'ALERTA STOCK BAJO - ' + new Date().toLocaleString('es-ES') + '\\n\\n';\nfor (const item of items) {\n  alerta += `- ${item.json.nombre} (${item.json.referencia}): ${item.json.stock} uds (min: ${item.json.stock_minimo})\\n`;\n}\nreturn [{ json: { texto_alerta: alerta, referencias: items.map(i => i.json.referencia) } }];"
+      },
+      "id": "node-crear-alerta",
+      "name": "Crear texto alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('stock_bajo', '{{ $json.texto_alerta }}', NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-guardar-alerta",
+      "name": "Guardar alerta en app",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [1080, 120],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } },
+      "notes": "Tu app Noxertez lee esta tabla y muestra las alertas con una campana de notificación"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE productos SET alerta_stock_enviada = 1 WHERE SKU_REF IN ('{{ $('Crear texto alerta').first().json.referencias.join(\"', '\") }}')",
+        "options": {}
+      },
+      "id": "node-marcar-alerta",
+      "name": "Marcar alerta enviada",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [1300, 120],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COUNT(*) as total_pedidos, COALESCE(SUM(total), 0) as facturado, COUNT(DISTINCT telefono) as clientes FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'",
+        "options": {}
+      },
+      "id": "node-stats",
+      "name": "Stats del día",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [420, 480],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT items_json FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'",
+        "options": {}
+      },
+      "id": "node-items-dia",
+      "name": "Items vendidos hoy",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [640, 480],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const stats = $('Stats del día').first().json;\nconst pedidos = $('Items vendidos hoy').all();\n\nconst conteo = {};\nfor (const p of pedidos) {\n  try {\n    const items = JSON.parse(p.json.items_json || '[]');\n    for (const item of items) {\n      const key = item.nombre || item.referencia || 'Desconocido';\n      conteo[key] = (conteo[key] || 0) + (item.cantidad || 1);\n    }\n  } catch(e) {}\n}\n\nconst top = Object.entries(conteo).sort((a,b) => b[1]-a[1]).slice(0,5);\nconst fecha = new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });\n\nlet resumen = `RESUMEN DEL DIA - ${fecha}\\n`;\nresumen += `Pedidos: ${stats.total_pedidos || 0}\\n`;\nresumen += `Facturado: ${(stats.facturado || 0).toFixed(2)} EUR\\n`;\nresumen += `Clientes: ${stats.clientes || 0}\\n`;\nif (top.length > 0) {\n  resumen += `\\nMas vendidos:\\n`;\n  top.forEach(([nombre, qty]) => { resumen += `  - ${nombre}: ${qty} uds\\n`; });\n}\n\nreturn [{ json: { resumen } }];"
+      },
+      "id": "node-crear-resumen",
+      "name": "Crear resumen del día",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 480]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('resumen_diario', '{{ $json.resumen }}', NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-guardar-resumen",
+      "name": "Guardar resumen en app",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [1080, 480],
+      "credentials": { "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" } }
+    }
+  ],
+  "connections": {
+    "Revisar stock (9h, 14h, 19h)": { "main": [[{ "node": "Artículos con stock bajo", "type": "main", "index": 0 }]] },
+    "Artículos con stock bajo": { "main": [[{ "node": "¿Stock bajo?", "type": "main", "index": 0 }]] },
+    "¿Stock bajo?": { "main": [[{ "node": "Crear texto alerta", "type": "main", "index": 0 }], []] },
+    "Crear texto alerta": { "main": [[{ "node": "Guardar alerta en app", "type": "main", "index": 0 }]] },
+    "Guardar alerta en app": { "main": [[{ "node": "Marcar alerta enviada", "type": "main", "index": 0 }]] },
+    "Resumen ventas a las 20h": { "main": [[{ "node": "Stats del día", "type": "main", "index": 0 }]] },
+    "Stats del día": { "main": [[{ "node": "Items vendidos hoy", "type": "main", "index": 0 }]] },
+    "Items vendidos hoy": { "main": [[{ "node": "Crear resumen del día", "type": "main", "index": 0 }]] },
+    "Crear resumen del día": { "main": [[{ "node": "Guardar resumen en app", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["stock", "resumen", "noxertez"]
+}

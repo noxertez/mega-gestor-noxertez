@@ -1,0 +1,166 @@
+/* Global Management High-Contrast DARK Theme v1.0 */
+:root {
+    --bg-main: #0f172a;
+    --bg-modal: #1e293b;
+    --border-glass: rgba(255, 255, 255, 0.1);
+    --accent-gold: #d4af37;
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --text-white: #ffffff;
+    --text-gray: #94a3b8;
+}
+
+body.management-page {
+    background-color: var(--bg-main) !important;
+    color: var(--text-white);
+    margin: 0;
+    padding: 0;
+}
+
+/* Common Layout Components */
+.panel-management {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+}
+
+.panel-header-wow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem 2rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-glass);
+}
+
+.panel-header-wow h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 2rem;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+/* Tables */
+.table-container-wow {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    border: 1px solid var(--border-glass);
+    overflow: hidden;
+    margin-bottom: 2rem;
+}
+
+.table-wow {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-wow th {
+    background: rgba(212, 175, 55, 0.1);
+    padding: 1.2rem;
+    text-align: left;
+    font-family: 'Cinzel', serif;
+    color: var(--accent-gold);
+    border-bottom: 1px solid var(--border-glass);
+    text-transform: uppercase;
+    font-size: 0.9rem;
+}
+
+.table-wow td {
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--border-glass);
+    color: #ffffff;
+}
+
+.table-wow tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Inputs & Search */
+.input-wow, .search-wow {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 1.1rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.input-wow:focus, .search-wow:focus {
+    border-color: var(--accent-gold);
+}
+
+/* Modals */
+.modal-overlay-wow {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.modal-content-wow {
+    background: #1a1c2c;
+    width: 90%;
+    max-width: 900px;
+    max-height: 90vh;
+    border-radius: 24px;
+    border: 1px solid var(--border-glass);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header-wow {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header-wow h2 {
+    font-family: 'Cinzel', serif;
+    color: var(--accent-gold);
+    margin: 0;
+}
+
+/* Buttons */
+.btn-premium-wow {
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Cinzel', serif;
+    transition: transform 0.2s, background 0.3s;
+}
+
+.btn-premium-wow:hover {
+    transform: translateY(-2px);
+}
+
+.btn-gold { background: var(--accent-gold); color: #000000; }
+.btn-blue { background: var(--accent-blue); color: #ffffff; }
+.btn-green { background: var(--accent-green); color: #ffffff; }
+.btn-red { background: #ef4444; color: #ffffff; }
+
+/* Status Badges */
+.badge-wow {
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: white;
+}

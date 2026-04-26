@@ -1,0 +1,126 @@
+/* Sahtout Admin Dashboard - Premium Noxertez Theme */
+:root {
+    --primary-gold: #d4af37;
+    --secondary-blue: #1b9bf0;
+    --dark-bg: #0a0a1a;
+    --card-bg: rgba(20, 20, 20, 0.9);
+}
+
+body {
+    background-color: var(--dark-bg);
+    color: #e0e0e0;
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.wrapper {
+    flex: 1;
+    background: url('../../img/backgrounds/pattern_dark.png'); /* Fallback if pattern exists */
+    background-attachment: fixed;
+}
+
+/* Titles and Headers */
+h1.h2 {
+    color: var(--primary-gold) !important;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+    border-bottom: 2px solid var(--primary-gold);
+    padding-bottom: 0.5rem;
+    margin-bottom: 2rem;
+}
+
+hr {
+    border-color: rgba(212, 175, 55, 0.2);
+}
+
+/* Dashboard Cards */
+.card {
+    background: var(--card-bg) !important;
+    border: 1px solid rgba(212, 175, 55, 0.3) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary-gold) !important;
+    box-shadow: 0 8px 25px rgba(212, 175, 55, 0.2) !important;
+}
+
+.card-title {
+    color: var(--primary-gold) !important;
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+}
+
+.display-4 {
+    font-weight: 800;
+    color: #fff;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Card Header */
+.card-header {
+    background: rgba(44, 44, 44, 0.5) !important;
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2) !important;
+    color: var(--primary-gold) !important;
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    padding: 1rem;
+}
+
+/* Buttons in Dashboard */
+.btn-warning {
+    background: linear-gradient(135deg, #d4af37, #b8860b) !important;
+    border: none !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    font-family: 'Cinzel', serif !important;
+    padding: 0.6rem 1.2rem !important;
+    border-radius: 6px !important;
+    transition: all 0.3s ease !important;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #ffd700, #d4af37) !important;
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+}
+
+/* Table styling for admin */
+.table {
+    color: #e0e0e0 !important;
+}
+
+.table th {
+    background: rgba(212, 175, 55, 0.1) !important;
+    color: var(--primary-gold) !important;
+    border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.table td {
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Container Adjustments */
+main {
+    padding-top: 1rem;
+}
+
+/* Quick Stats Specifics */
+.border-warning {
+    border-color: rgba(212, 175, 55, 0.4) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    h1.h2 {
+        font-size: 1.5rem;
+    }
+}

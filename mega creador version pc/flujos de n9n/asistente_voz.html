@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Asistente Noxertez</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+  .panel {
+    background: #16213e;
+    border-radius: 20px;
+    padding: 32px;
+    width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    border: 1px solid #0f3460;
+  }
+
+  h2 { text-align: center; color: #e94560; margin-bottom: 6px; font-size: 1.4rem; }
+  .subtitulo { text-align: center; color: #888; font-size: 0.85rem; margin-bottom: 28px; }
+
+  /* Botón micrófono */
+  .mic-wrapper { display: flex; justify-content: center; margin-bottom: 24px; }
+  #btnMic {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: #0f3460; border: 3px solid #e94560;
+    cursor: pointer; font-size: 2.2rem;
+    transition: all 0.2s; outline: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #btnMic:hover { background: #e94560; transform: scale(1.05); }
+  #btnMic.escuchando {
+    background: #e94560;
+    animation: pulso 1s infinite;
+    border-color: #ff6b6b;
+  }
+  @keyframes pulso {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(233,69,96,0.4); }
+    50% { box-shadow: 0 0 0 18px rgba(233,69,96,0); }
+  }
+
+  /* Estado */
+  #estado {
+    text-align: center; font-size: 0.9rem; color: #888;
+    margin-bottom: 20px; min-height: 22px;
+  }
+  #estado.activo { color: #e94560; }
+  #estado.pensando { color: #f0a500; }
+  #estado.respondiendo { color: #4ecca3; }
+
+  /* Burbuja de texto transcrito */
+  .burbuja-label { font-size: 0.75rem; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  #textoTranscrito {
+    background: #0f3460; border-radius: 12px; padding: 14px;
+    min-height: 52px; font-size: 0.95rem; color: #ccc;
+    margin-bottom: 16px; border: 1px solid #1a4a80;
+    font-style: italic;
+  }
+  #textoTranscrito.vacio { color: #555; }
+
+  /* Burbuja respuesta */
+  #respuesta {
+    background: #0d2137; border-radius: 12px; padding: 14px;
+    min-height: 70px; font-size: 1rem; color: #4ecca3;
+    margin-bottom: 20px; border: 1px solid #1a5040;
+    line-height: 1.5;
+  }
+  #respuesta.vacio { color: #555; font-style: italic; font-size: 0.9rem; }
+
+  /* Comandos de ejemplo */
+  .ejemplos { margin-bottom: 20px; }
+  .ejemplos-label { font-size: 0.75rem; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .ejemplo {
+    display: inline-block; background: #0f3460; border: 1px solid #1a4a80;
+    border-radius: 20px; padding: 5px 12px; font-size: 0.8rem; color: #aaa;
+    margin: 3px; cursor: pointer; transition: all 0.15s;
+  }
+  .ejemplo:hover { background: #e94560; color: white; border-color: #e94560; }
+
+  /* Botón detener voz */
+  #btnDetener {
+    width: 100%; padding: 10px; background: transparent;
+    border: 1px solid #444; border-radius: 8px; color: #888;
+    cursor: pointer; font-size: 0.85rem; transition: all 0.15s;
+  }
+  #btnDetener:hover { border-color: #e94560; color: #e94560; }
+
+  /* Indicador conexión n8n */
+  .conexion { display: flex; align-items: center; gap: 8px; margin-top: 16px; justify-content: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ecca3; }
+  .dot.off { background: #e94560; }
+  .conexion span { font-size: 0.75rem; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <h2>🎙️ Asistente Noxertez</h2>
+  <p class="subtitulo">Habla para consultar o anotar cosas</p>
+
+  <div class="mic-wrapper">
+    <button id="btnMic" title="Pulsa para hablar">🎤</button>
+  </div>
+
+  <div id="estado">Pulsa el micrófono y habla</div>
+
+  <div class="burbuja-label">Lo que dijiste:</div>
+  <div id="textoTranscrito" class="vacio">— esperando —</div>
+
+  <div class="burbuja-label">Respuesta:</div>
+  <div id="respuesta" class="vacio">— aquí aparecerá la respuesta —</div>
+
+  <div class="ejemplos">
+    <div class="ejemplos-label">Comandos de ejemplo (pulsa para probar):</div>
+    <span class="ejemplo" onclick="probarComando(this.textContent)">faltan tornillos M6</span>
+    <span class="ejemplo" onclick="probarComando(this.textContent)">qué hay que hacer hoy</span>
+    <span class="ejemplo" onclick="probarComando(this.textContent)">pedidos pendientes</span>
+    <span class="ejemplo" onclick="probarComando(this.textContent)">cuántos tornillos M8 hay</span>
+    <span class="ejemplo" onclick="probarComando(this.textContent)">resumen del día</span>
+    <span class="ejemplo" onclick="probarComando(this.textContent)">anota que faltan tuercas M10</span>
+  </div>
+
+  <button id="btnDetener" onclick="detenerVoz()">⏹ Detener voz</button>
+
+  <div class="conexion">
+    <div class="dot" id="dotConexion"></div>
+    <span id="labelConexion">Conectado a n8n</span>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURACIÓN
+// ============================================================
+const N8N_URL = 'http://localhost:5678/webhook/asistente';
+// Si tu servidor web (Flask) corre en otro puerto, usa:
+// const N8N_URL = 'http://localhost:5678/webhook/asistente';
+
+// ============================================================
+// ELEMENTOS DEL DOM
+// ============================================================
+const btnMic = document.getElementById('btnMic');
+const estado = document.getElementById('estado');
+const textoTranscrito = document.getElementById('textoTranscrito');
+const respuestaDiv = document.getElementById('respuesta');
+const dotConexion = document.getElementById('dotConexion');
+const labelConexion = document.getElementById('labelConexion');
+
+// ============================================================
+// WEB SPEECH API - RECONOCIMIENTO DE VOZ
+// ============================================================
+let recognition = null;
+let estaEscuchando = false;
+let vozSintesis = window.speechSynthesis;
+
+function inicializarReconocimiento() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    mostrarError('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.');
+    return false;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'es-ES';       // Español de España
+  recognition.continuous = false;    // Para en cuanto detecta pausa
+  recognition.interimResults = true; // Muestra texto mientras hablas
+
+  recognition.onstart = () => {
+    estaEscuchando = true;
+    btnMic.classList.add('escuchando');
+    btnMic.textContent = '🔴';
+    setEstado('Escuchando...', 'activo');
+    textoTranscrito.textContent = '...';
+    textoTranscrito.classList.remove('vacio');
+  };
+
+  recognition.onresult = (event) => {
+    let textoFinal = '';
+    let textoParcial = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      if (event.results[i].isFinal) {
+        textoFinal += event.results[i][0].transcript;
+      } else {
+        textoParcial += event.results[i][0].transcript;
+      }
+    }
+    textoTranscrito.textContent = textoFinal || textoParcial;
+    if (textoFinal) procesarComando(textoFinal.trim());
+  };
+
+  recognition.onerror = (event) => {
+    detenerEscucha();
+    if (event.error === 'no-speech') {
+      setEstado('No detecté voz. Intenta de nuevo.', '');
+    } else if (event.error === 'not-allowed') {
+      mostrarError('Permiso de micrófono denegado. Habilítalo en el navegador.');
+    } else {
+      setEstado('Error: ' + event.error, '');
+    }
+  };
+
+  recognition.onend = () => {
+    detenerEscucha();
+  };
+
+  return true;
+}
+
+function toggleMicrofono() {
+  if (estaEscuchando) {
+    recognition.stop();
+    return;
+  }
+  if (!recognition) {
+    if (!inicializarReconocimiento()) return;
+  }
+  recognition.start();
+}
+
+function detenerEscucha() {
+  estaEscuchando = false;
+  btnMic.classList.remove('escuchando');
+  btnMic.textContent = '🎤';
+  if (!estado.classList.contains('respondiendo')) {
+    setEstado('Pulsa el micrófono y habla', '');
+  }
+}
+
+// ============================================================
+// ENVIAR COMANDO A N8N Y LEER RESPUESTA EN VOZ
+// ============================================================
+async function procesarComando(texto) {
+  if (!texto) return;
+  setEstado('Consultando...', 'pensando');
+  respuestaDiv.textContent = '...';
+  respuestaDiv.classList.remove('vacio');
+
+  try {
+    const res = await fetch(N8N_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ texto: texto })
+    });
+
+    if (!res.ok) throw new Error('n8n devolvió error ' + res.status);
+
+    const data = await res.json();
+    const respuesta = data.respuesta || 'Sin respuesta';
+
+    respuestaDiv.textContent = respuesta;
+    setEstado('Respondiendo...', 'respondiendo');
+    leerEnVoz(respuesta);
+    marcarConectado(true);
+
+  } catch (err) {
+    const msg = 'No pude conectar con n8n. Comprueba que está activo.';
+    respuestaDiv.textContent = msg;
+    setEstado('Error de conexión', '');
+    marcarConectado(false);
+    leerEnVoz(msg);
+  }
+}
+
+// ============================================================
+// WEB SPEECH API - SÍNTESIS DE VOZ (el navegador habla)
+// ============================================================
+function leerEnVoz(texto) {
+  // Cancelar si ya estaba hablando
+  vozSintesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(texto);
+  utterance.lang = 'es-ES';
+  utterance.rate = 1.0;   // Velocidad (0.5 a 2)
+  utterance.pitch = 1.0;  // Tono (0 a 2)
+  utterance.volume = 1.0;
+
+  // Intentar usar una voz española si está disponible
+  const voces = vozSintesis.getVoices();
+  const vozEs = voces.find(v => v.lang.startsWith('es') && v.localService) ||
+                voces.find(v => v.lang.startsWith('es'));
+  if (vozEs) utterance.voice = vozEs;
+
+  utterance.onend = () => {
+    setEstado('Pulsa el micrófono y habla', '');
+  };
+
+  vozSintesis.speak(utterance);
+}
+
+function detenerVoz() {
+  vozSintesis.cancel();
+  if (recognition) recognition.stop();
+  setEstado('Voz detenida. Pulsa el micrófono para continuar.', '');
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function setEstado(texto, clase) {
+  estado.textContent = texto;
+  estado.className = clase || '';
+}
+
+function mostrarError(msg) {
+  setEstado(msg, '');
+  respuestaDiv.textContent = msg;
+  respuestaDiv.classList.remove('vacio');
+}
+
+function marcarConectado(ok) {
+  dotConexion.className = 'dot' + (ok ? '' : ' off');
+  labelConexion.textContent = ok ? 'Conectado a n8n' : 'n8n desconectado';
+}
+
+// Probar comandos con los botones de ejemplo
+function probarComando(texto) {
+  textoTranscrito.textContent = texto;
+  textoTranscrito.classList.remove('vacio');
+  procesarComando(texto);
+}
+
+// Verificar conexión con n8n al cargar
+async function verificarConexion() {
+  try {
+    await fetch(N8N_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{"texto":"test"}', signal: AbortSignal.timeout(2000) });
+    marcarConectado(true);
+  } catch {
+    marcarConectado(false);
+  }
+}
+
+// ============================================================
+// EVENTOS
+// ============================================================
+btnMic.addEventListener('click', toggleMicrofono);
+
+// Cargar voces disponibles (Chrome las carga async)
+if (vozSintesis.onvoiceschanged !== undefined) {
+  vozSintesis.onvoiceschanged = () => {}; // Solo para forzar la carga
+}
+
+verificarConexion();
+</script>
+</body>
+</html>

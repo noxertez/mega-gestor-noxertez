@@ -1,0 +1,108 @@
+{
+    "API_KEYS": [
+        {
+            "nombre": "Principal",
+            "key": "AIzaSyDkG3eKE3jK3brV2P1-DDOJZZ3Phco7OuU"
+        },
+        {
+            "nombre": "animal",
+            "key": "AIzaSyA-Kj1KSRAK3AC7T91HI-6cnh_dUAmbxDk"
+        }
+    ],
+    "MODELO_IA": "models/gemini-1.5-flash",
+    "GROQ_KEYS": [
+        {
+            "nombre": "bulldog",
+            "key": "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"
+        },
+        {
+            "nombre": "bulldog 002",
+            "key": "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"
+        }
+    ],
+    "GROQ_MODELO": "llama-3.1-70b-versatile",
+    "IA_PREFERIDA": "Groq",
+    "ESTILO_IA_ACTUAL": "Neutral",
+    "ULTIMO_NUMERO_SKU": 39,
+    "CATEGORIAS": {
+        "PORTAVELAS": [
+            "ABSTRACTO",
+            "TRONCO",
+            "ZIGZAG",
+            "ALFAJIA",
+            "OLIVO",
+            "PIEDRA"
+        ],
+        "INCIENSO": [
+            "REFLUJO",
+            "CURVO",
+            "RECTANGULAR"
+        ],
+        "CUADRO": [
+            "3D",
+            "CORAZON",
+            "INTERIOR",
+            "ESTRELLA",
+            "NAUTICO"
+        ],
+        "CORAZON": [
+            "INTERIOR",
+            "COLOR",
+            "PINO",
+            "LED"
+        ],
+        "LAMPARA": [],
+        "PEDESTAL": [
+            "CORAZON"
+        ],
+        "DECORACION": [
+            "COLGANTE"
+        ],
+        "ESPEJO": [
+            "RUSTICO"
+        ]
+    },
+    "MARCAS": {
+        "NOXERTEZ": {
+            "nombre": "NOXERTEZ",
+            "slogan": "EL ARTE CON MADERA PERFECTAMENTE IMPERFECTO",
+            "color_primario": "#581c87",
+            "color_secundario": "#c5a059",
+            "color_pastel": "#eae6ff"
+        },
+        "CANDLE HOLDER OF THE SOUL": {
+            "nombre": "CANDLE HOLDER OF THE SOUL",
+            "slogan": "CANDLE HOLDER & WARMTH FOR YOUR HOME",
+            "color_primario": "#78350f",
+            "color_secundario": "#d6d3d1",
+            "color_pastel": "#fff4cc"
+        },
+        "THE SECRET ZEN GARDEN": {
+            "nombre": "THE SECRET ZEN GARDEN",
+            "slogan": "NATURE'S BALANCE IN ANCIENT WOOD STONES",
+            "color_primario": "#064e3b",
+            "color_secundario": "#a3e635",
+            "color_pastel": "#e0f7e4"
+        }
+    },
+    "FESTIVIDADES": [
+        "Sin festividad",
+        "San Valent\u00edn",
+        "Navidad",
+        "D\u00eda de la Madre",
+        "D\u00eda del Padre",
+        "Halloween",
+        "Pascua",
+        "VERANO"
+    ],
+    "COLORES": [
+        "NATURAL",
+        "MADERA",
+        "BLANCO",
+        "NEGRO",
+        "AZUL",
+        "ROJO",
+        "VERDE",
+        "PLATA"
+    ]
+}

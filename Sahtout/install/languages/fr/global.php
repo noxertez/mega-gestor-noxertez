@@ -1,0 +1,201 @@
+<?php
+return [
+    // ========================================
+    // === GÉNÉRAL & NAVIGATION ===
+    // ========================================
+    'installer_title'             => 'Installateur SahtoutCMS',
+    'installer_name'              => 'Installateur SahtoutCMS',
+    'step'                        => 'Étape',
+    'requirement'                 => 'Exigence',
+    'status'                      => 'Statut',
+    'extension'                   => 'Extension',
+    'module'                      => 'Module',
+    'enabled'                     => 'Activé',
+    'missing'                     => 'Manquant',
+    'unknown'                     => 'Inconnu',
+
+    // ========================================
+    // === INDEX.PHP (BIENVENUE) ===
+    // ========================================
+    'welcome_message_line1'       => 'Bienvenue, aventurier.',
+    'welcome_message_line2'       => 'Cet installateur va vous guider dans la configuration de <strong>SahtoutCMS</strong>, pour les serveurs privés World of Warcraft.',
+    'welcome_message_line3'       => 'Préparez vos identifiants de base de données et votre serveur, le voyage commence maintenant.',
+    'note_dev_info'               => 'Remarque : J\'ai créé ce projet seul, pour le plaisir, l\'apprentissage et les tests. Bien que j\'aie essayé de le rendre professionnel, ce n\'est pas un projet d\'équipe, et certains bugs peuvent exister. Profitez-en et donnez-moi votre avis si vous trouvez des problèmes !',
+    'btn_begin_install'           => 'Commencer l\'installation',
+
+    // ========================================
+    // === STEP2_CHECK.PHP ===
+    // ========================================
+    'step2_title'                 => 'Étape 2 : Vérification de l\'environnement',
+    'php_version'                 => 'Version PHP',
+    'required_php_extensions'     => 'Extensions PHP requises',
+    'optional_php_extensions'     => 'Extensions PHP facultatives',
+    'required_apache_modules'     => 'Modules Apache requis',
+    'optional_apache_modules'     => 'Modules Apache facultatifs',
+    'btn_how_to_enable'           => '💡 Comment activer les extensions PHP et modules Apache ?',
+    'help_php_extensions'         => 'Extensions PHP',
+    'help_php_desc'               => 'Pour activer une extension PHP :',
+    'help_php_path'               => 'Allez dans C:\\xampp\\php',
+    'help_php_ini'                => 'Localisez votre fichier <code>php.ini</code>.',
+    'help_php_uncomment'          => 'Trouvez la ligne avec le nom de l\'extension, ex : <code>;extension=curl</code>.',
+    'help_php_enable'             => 'Supprimez le point-virgule <code>;</code> pour l\'activer : <code>extension=curl</code>.',
+    'help_php_restart'            => 'Redémarrez votre serveur web (Apache/Nginx).',
+    'help_apache_modules'         => 'Modules Apache',
+    'help_apache_desc'            => 'Pour activer les modules Apache :',
+    'help_apache_path'            => 'Allez dans C:\\xampp\\apache\\conf',
+    'help_apache_httpd'           => 'Sur XAMPP Windows, vérifiez le fichier <code>httpd.conf</code> et décommentez les lignes des modules.',
+    'help_apache_restart'         => 'Redémarrez Apache :',
+    'img_example'                 => 'exemple d\'image',
+    'btn_proceed_to_db'           => 'Passer à la configuration de la base de données ➡️',
+    'err_required_failed'         => '❌ Certaines vérifications obligatoires ont échoué. Corrigez-les avant de continuer.',
+
+    // ========================================
+    // === STEP3_DB.PHP ===
+    // ========================================
+    // Installer Step 3
+    'installer_title' => 'SahtoutCMS - Installateur',
+    'step3_title' => 'Étape 3 : Configuration Base de données & reCAPTCHA',
+    'db_auth' => 'Base Auth',
+    'db_world' => 'Base World',
+    'db_char' => 'Base Char',
+    'db_site' => 'Base Site',
+
+    'label_db_host' => 'Hôte',
+    'label_db_port' => 'Port',
+    'label_db_user' => 'Utilisateur',
+    'label_db_pass' => 'Mot de passe',
+    'label_db_name' => 'Nom de la base',
+
+    'section_recaptcha' => 'Configuration reCAPTCHA V2',
+    'label_recaptcha_enabled' => 'Activer reCAPTCHA',
+    'label_recaptcha_site_key' => 'Clé du site',
+    'label_recaptcha_secret_key' => 'Clé secrète',
+    'placeholder_recaptcha_default' => 'Laisser vide pour utiliser la valeur par défaut',
+    'note_recaptcha_empty' => 'Laisser vide pour utiliser les clés de test par défaut.',
+
+    'err_host_required' => '[%s] L’hôte est requis',
+    'err_user_required' => '[%s] L’utilisateur est requis',
+    'err_port_invalid' => '[%s] Le port doit être entre 1 et 65535',
+    'err_dbname_required' => '[%s] Le nom de la base est requis',
+    'err_connection_failed' => 'Connexion échouée : %s',
+    'err_missing_tables' => 'Tables manquantes : %s',
+    'msg_db_ok' => 'Connecté & tables OK',
+    'err_recaptcha_keys_required' => 'La clé du site et la clé secrète reCAPTCHA sont requises si activé.',
+    'err_config_dir_not_writable' => 'Dossier de configuration non inscriptible : %s',
+    'err_cap_dir_not_writable' => 'Dossier reCAPTCHA non inscriptible : %s',
+    'err_failed_write_config' => 'Échec de l’écriture de config.php',
+    'err_failed_write_cap' => 'Échec de l’écriture de config.cap.php',
+
+    'msg_config_saved' => 'Toutes les bases sont connectées ! Fichiers de configuration créés.',
+    'btn_proceed_to_realm' => 'Passer à l’étape 4 : Configuration des royaumes',
+    'btn_test_save_db' => 'Tester & Sauvegarder',
+
+    'enabled' => 'Activé',
+    'disabled' => 'Désactivé',
+    'success' => 'Succès',
+    'error' => 'Erreur',
+    'err_fix_errors' => 'Veuillez corriger les erreurs suivantes :',
+
+    // ========================================
+    // === STEP4_REALM.PHP ===
+    // ========================================
+     'forge_title' => 'Sahtout RealmForge',
+'forge_name' => '⚔️ Configuration de RealmForge',
+'step4_title' => 'Phase 4 : Configuration du royaume',
+'section_realm_config' => 'Configuration du royaume',
+'err_fix_errors_realm' => 'Résolvez les problèmes suivants :',
+'msg_realm_saved' => 'Configuration du royaume enregistrée avec succès !',
+'label_realm_name' => 'Nom du royaume',
+'label_realm_ip' => 'Adresse / Hôte du royaume',
+'label_realm_port' => 'Port du royaume',
+'label_realm_logo' => 'Emblème du royaume',
+'placeholder_realm_name' => 'Entrez le nom du royaume',
+'placeholder_realm_logo' => 'Téléversez un emblème PNG, SVG, JPG ou WebP (max 2 Mo).',
+'btn_choose_file' => 'Sélectionner un emblème',
+'btn_save_realm' => 'Enregistrer la configuration du royaume',
+'btn_proceed_to_mail' => 'Passer à la configuration de l’email ➡️',
+'note_realm_config' => 'Remarque : ceci configure les paramètres du royaume.',
+'err_realm_name_required' => 'Le nom du royaume est obligatoire.',
+'err_realm_ip_required' => 'L’adresse du royaume est obligatoire.',
+'err_realm_port_invalid' => 'Le port du royaume doit être un nombre valide (1-65535).',
+'err_config_dir_not_writable_realm' => 'Le répertoire de configuration n’est pas accessible en écriture : %s',
+'err_write_realm_config' => 'Impossible d’écrire le fichier de configuration du royaume : %s',
+'err_read_realm_config' => 'Impossible de lire le fichier de configuration du royaume : %s',
+'err_update_realm_config' => 'Échec de la mise à jour de la configuration : $realmlist introuvable ou invalide.',
+'error_realm_logo_too_large' => 'La taille de l’emblème dépasse 2 Mo.',
+'error_invalid_realm_logo_type' => 'Format d’emblème invalide. Seuls PNG, SVG, JPG ou WebP sont autorisés.',
+'error_realm_logo_upload_failed' => 'Échec du téléversement de l’emblème. Vérifiez les permissions du serveur.',
+'error_direct_access_realm' => 'L’accès direct à ce fichier est interdit.',
+'error_access_denied' => 'Accès refusé.',
+
+
+    // ========================================
+    // === STEP5_MAIL.PHP ===
+    // ========================================
+   'step5_title' => 'Étape 5 : Configuration de l\'e-mail',
+    'err_smtp_host_required' => 'L\'hôte SMTP est requis.',
+    'err_smtp_user_required' => 'Le nom d\'utilisateur SMTP est requis.',
+    'err_smtp_pass_required' => 'Le mot de passe SMTP est requis.',
+    'mail_test_subject' => 'E-mail de test - Sahtout CMS',
+    'mail_test_body' => 'Ceci est un e-mail de test depuis l\'installation de votre Sahtout CMS.',
+    'err_write_mail_config' => 'Impossible d\'écrire dans %s.',
+    'err_smtp_test_failed' => 'Échec du test SMTP : %s',
+    'error_direct_access' => 'L\'accès direct à ce fichier n\'est pas autorisé.',
+    'msg_mail_saved' => 'Configuration de l\'e-mail enregistrée ! E-mail de test envoyé avec succès.',
+    'btn_proceed_to_soap' => 'Passer à la configuration SOAP ➡️',
+    'label_enable_smtp' => 'Activer le mailer SMTP ?',
+    'smtp_mail_enabled' => 'Activé',
+    'smtp_mail_missing' => 'Désactivé',
+    'section_smtp_config' => 'Configuration SMTP',
+    'label_smtp_host' => 'Hôte SMTP',
+    'label_email_address' => 'Adresse e-mail',
+    'label_app_password' => 'Mot de passe d\'application / Mot de passe SMTP',
+    'label_from_email' => 'E-mail de l\'expéditeur',
+    'label_from_name' => 'Nom de l\'expéditeur',
+    'label_port' => 'Port',
+    'label_encryption' => 'Chiffrement (tls ou ssl)',
+    'placeholder_smtp_host' => 'par ex., smtp.gmail.com',
+    'placeholder_email' => 'par ex., votrenom@gmail.com',
+    'placeholder_app_password' => 'Mot de passe d\'application pour Gmail/Outlook',
+    'helper_title_smtp' => 'Comment obtenir vos informations SMTP / Mot de passe d\'application (Cliquez pour développer)',
+    'helper_smtp_li1' => 'Utilisez un compte e-mail réel (Gmail, Outlook, ou votre propre domaine).',
+    'helper_smtp_li2' => 'Pour Gmail, activez l\'authentification à deux facteurs et générez un <strong>mot de passe d\'application</strong>.',
+    'helper_smtp_li3' => 'Exemples d\'hôtes SMTP :',
+    'helper_smtp_custom_domain' => 'Domaine personnalisé : généralement mail.votredomaine.com',
+    'helper_smtp_li4' => 'Utilisez le port <strong>587</strong> avec <strong>TLS</strong> ou le port <strong>465</strong> avec <strong>SSL</strong>.',
+    'helper_smtp_li5' => 'Entrez votre adresse e-mail comme nom d\'utilisateur et votre mot de passe d\'application (ou mot de passe habituel si autorisé).',
+    'helper_smtp_li6' => 'L\'e-mail de l\'expéditeur peut être le même que l\'utilisateur SMTP ou un autre expéditeur que vous possédez.',
+
+    // ========================================
+    // === STEP6_SOAP.PHP ===
+    // ========================================
+    'step6_title'                 => 'Étape 6 : Configuration SOAP',
+    'section_soap_config'         => 'Configuration SOAP',
+    'label_soap_url'              => 'URL SOAP',
+    'label_gm_username'           => 'Nom d\'utilisateur GM',
+    'placeholder_gm_level3'       => 'Doit être niveau GM 3',
+    'label_soap_password'         => 'Mot de passe SOAP',
+    'placeholder_soap_pass'       => 'Mot de passe SOAP = Mot de passe du compte',
+    'btn_save_verify_gm'          => 'Sauvegarder et vérifier GM',
+    'err_soap_account_not_found'  => 'Le compte \'%s\' n\'existe pas dans la base Auth.',
+    'err_soap_gm_level'           => 'Le compte \'%s\' existe mais n\'est pas niveau GM 3.',
+    'err_write_soap_config'       => 'Impossible d\'écrire dans',
+    'msg_soap_saved'              => 'Configuration SOAP sauvegardée ! Compte GM vérifié.',
+    'msg_soap_note'               => 'Assurez-vous qu\'il est GM',
+    'btn_proceed_to_finish'       => 'Passer à la fin de l\'installation ➡️',
+    'important_steps'             => 'Étapes importantes :',
+    'info_soap_li1'               => 'Assurez-vous que le compte GM existe dans votre base Auth et a le niveau GM 3 dans <code>account_access</code> avec <code>RealmID = -1</code>.',
+    'info_soap_li2'               => 'Ouvrez votre fichier <code>worldserver.conf</code> et activez : <strong>SOAP.Enabled = 1</strong>',
+    'info_soap_li3'               => 'Assurez-vous que le port SOAP dans <code>soap_url</code> est correct et accessible.',
+    'footer_connect'    => '🌟 Restons en contact :',
+'footer_all_rights' => 'Tous droits réservés.',
+// === FINISH.PHP ===
+'finish_title'               => 'Installation terminée',
+'err_config_missing'         => 'Fichier de configuration manquant :',
+'finish_errors_msg'          => 'Certains fichiers de configuration requis sont manquants. Vérifiez que toutes les étapes sont terminées.',
+'finish_all_present'         => 'Tous les fichiers de configuration sont présents !',
+'finish_congrats'            => 'Félicitations, SahtoutCMS est entièrement installé et prêt à l\'emploi.',
+'finish_security_note'       => 'Pour des raisons de sécurité, nous vous recommandons fortement de <strong>supprimer le dossier "install"</strong> de votre serveur.',
+'btn_go_to_homepage'         => 'Aller à la page d\'accueil SahtoutCMS',
+
+];

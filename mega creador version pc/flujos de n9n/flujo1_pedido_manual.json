@@ -1,0 +1,69 @@
+{
+  "name": "01 - Pedido Manual desde App Noxertez",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nuevo-pedido",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook Pedido Manual",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "notes": "Tu app Noxertez llama aquí cuando creas un pedido manual. URL: http://localhost:5678/webhook/nuevo-pedido"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Recibir datos del formulario de tu app Noxertez\n// Tu app Flask manda un POST con estos campos:\n// { cliente, telefono, items: [{referencia, nombre, cantidad, precio}], canal, notas }\n\nconst body = $input.first().json;\n\n// Validar que vienen los campos mínimos\nif (!body.items || body.items.length === 0) {\n  throw new Error('El pedido no tiene artículos');\n}\n\nconst numeroPedido = 'PED-' + Date.now();\nlet total = 0;\n\nconst items = body.items.map(item => {\n  const subtotal = (item.precio || 0) * (item.cantidad || 1);\n  total += subtotal;\n  return {\n    referencia: item.referencia || 'SIN-REF',\n    nombre: item.nombre || item.referencia,\n    cantidad: item.cantidad || 1,\n    precio_unit: item.precio || 0,\n    subtotal: subtotal\n  };\n});\n\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: body.telefono || '',\n  nombre_cliente: body.cliente || 'Cliente sin nombre',\n  items_json: JSON.stringify(items),\n  total: total,\n  estado: 'pendiente',\n  fecha_pedido: new Date().toISOString(),\n  canal: body.canal || 'manual',\n  notas: body.notas || ''\n}}];"
+      },
+      "id": "node-preparar",
+      "name": "Preparar datos pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, items_json, total, estado, fecha_pedido, canal, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.items_json }}', {{ $json.total }}, '{{ $json.estado }}', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.notas }}')",
+        "options": {}
+      },
+      "id": "node-mysql",
+      "name": "Guardar en MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 1,
+      "position": [640, 300],
+      "credentials": {
+        "mySql": { "id": "MI_CRED_MYSQL", "name": "Noxertez MySQL" }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"numero_pedido\": \"{{ $('Preparar datos pedido').first().json.numero_pedido }}\",\n  \"total\": {{ $('Preparar datos pedido').first().json.total }},\n  \"mensaje\": \"Pedido guardado correctamente\"\n}"
+      },
+      "id": "node-responder",
+      "name": "Responder a la app",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [860, 300],
+      "notes": "La app recibe el número de pedido generado para mostrarlo en pantalla"
+    }
+  ],
+  "connections": {
+    "Webhook Pedido Manual": {
+      "main": [[{ "node": "Preparar datos pedido", "type": "main", "index": 0 }]]
+    },
+    "Preparar datos pedido": {
+      "main": [[{ "node": "Guardar en MySQL", "type": "main", "index": 0 }]]
+    },
+    "Guardar en MySQL": {
+      "main": [[{ "node": "Responder a la app", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["pedidos", "manual", "noxertez"]
+}

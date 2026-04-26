@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database and Credentials
+db_connection_info.md
+noxertez-v3.json
+.env
+
+# Logs and Debug
+*.log
+*.txt
+res_*.txt
+diag_*.txt
+debug_*.php
+tmp_*.php
+
+# Temporary HTML verifications
+stock_render.html
+stock_debug.html
+stock_final_verify.html
+producto_verify.html
+producto_p_verify.html
+
+# OS files
+.DS_Store
+Thumbs.db
