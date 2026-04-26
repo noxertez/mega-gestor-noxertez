@@ -45,7 +45,8 @@ $protected_pages = ['account.php', 'buy_item.php'];
 $admin_pages = [
     'dashboard.php', 'users.php', 'anews.php', 'characters.php', 'ashop.php', 'gm_cmd.php', 'logout.php', 'save_general.php',
     'ventas.php', 'stock.php', 'clientes.php', 'envios.php', 'ficha_cliente.php', 'flujo_pedidos.php', 'futuros_proyectos.php',
-    'herramientas.php', 'influencers.php', 'kanban.php', 'pedidos.php', 'tareas.php', 'urgentes.php', 'asistente_voz.php', 'chatbot_admin.php'
+    'herramientas.php', 'influencers.php', 'kanban.php', 'pedidos.php', 'tareas.php', 'urgentes.php', 'asistente_voz.php', 'chatbot_admin.php',
+    'pinterest.php'
 ];
 $current_page = basename($_SERVER['PHP_SELF']);
 

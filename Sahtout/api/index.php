@@ -1,7 +1,7 @@
 <?php
 // Suprimir errores para que no rompan el JSON
-ini_set('display_errors', 0);
-error_reporting(0);
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 ob_start(); // Buffer de salida: captura cualquier output accidental
 
 require_once 'config.php';
@@ -35,6 +35,7 @@ switch($ruta) {
     case 'flujo_dashboard_stats':
     case 'flujo_plantilla_save_all':
     case 'flujo_sync_kanban': require 'flujo.php';           break;
+    case 'pinterest':         require 'pinterest_api.php';  break;
     default:
         http_response_code(404);
         echo json_encode(['error' => 'Ruta no encontrada: ' . $ruta]);

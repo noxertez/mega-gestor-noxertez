@@ -74,6 +74,11 @@ $page_class = $page_class ?? '';
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link <?php echo $page_class === 'pinterest' ? 'active' : ''; ?>" href="<?php echo $base_path; ?>pages/pinterest.php" style="color: #E60023 !important;">
+                        <i class="fab fa-pinterest me-2"></i> Pinterest Publisher
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link text-danger" href="<?php echo $base_path; ?>logout">
                         <i class="fas fa-sign-out-alt me-2"></i> <?php echo translate('logout', 'Logout'); ?>
                     </a>
