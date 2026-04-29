@@ -186,6 +186,16 @@ include $project_root . 'includes/header.php';
                                             <i class="fas fa-address-book"></i> CLIENTES
                                         </a>
                                     </div>
+                                    <div class="col-6">
+                                        <a href="<?= $base_path ?>pages/pinterest.php" class="btn-premium-wow w-100" style="justify-content:center; padding: 0.8rem; font-size: 0.9rem; background: #E60023;">
+                                            <i class="fab fa-pinterest"></i> PINTEREST
+                                        </a>
+                                    </div>
+                                    <div class="col-6">
+                                        <a href="<?= $base_path ?>pages/linkedin.php" class="btn-premium-wow w-100" style="justify-content:center; padding: 0.8rem; font-size: 0.9rem; background: #0A66C2;">
+                                            <i class="fab fa-linkedin"></i> LINKEDIN
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -210,6 +220,8 @@ include $project_root . 'includes/header.php';
                                             <li><a href="<?= $base_path ?>pages/vote.php"><i class="fas fa-vote-yea text-info"></i> Votos</a></li>
                                             <li><a href="<?= $base_path ?>pages/urgentes.php"><i class="fas fa-exclamation-triangle text-info"></i> Urgentes</a></li>
                                             <li><a href="<?= $base_path ?>pages/tareas.php"><i class="fas fa-tasks text-info"></i> Tareas</a></li>
+                                            <li><a href="<?= $base_path ?>pages/pinterest.php" style="color:#E60023"><i class="fab fa-pinterest"></i> Pinterest Publisher</a></li>
+                                            <li><a href="<?= $base_path ?>pages/linkedin.php" style="color:#0A66C2"><i class="fab fa-linkedin"></i> LinkedIn Publisher</a></li>
                                         </ul>
                                     </div>
                                     <div class="col-6">

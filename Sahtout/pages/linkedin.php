@@ -1,0 +1,702 @@
+<!-- DEBUG_NOXERTEZ_VERSION_7 -->
+<?php
+if (!defined('ALLOWED_ACCESS')) define('ALLOWED_ACCESS', true);
+require_once '../includes/session.php';
+
+// FORZAR LOGIN si no hay sesión
+if (empty($_SESSION['user_id'])) {
+    header('Location: ' . $base_path . 'login?error=invalid_session');
+    exit();
+}
+
+require_once '../api/config.php';
+$db = conectar();
+
+// Crear tabla linkedin_queue si no existe
+$db->exec("CREATE TABLE IF NOT EXISTS `linkedin_queue` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `tipo` varchar(30) DEFAULT 'manual',
+  `sku_ref` varchar(255) DEFAULT NULL,
+  `titulo` varchar(255) DEFAULT NULL,
+  `texto` text,
+  `imagen_url` text,
+  `enlace` text,
+  `estado` varchar(20) DEFAULT 'borrador',
+  `fecha_programada` datetime DEFAULT NULL,
+  `fecha_publicado` datetime DEFAULT NULL,
+  `linkedin_post_id` varchar(255) DEFAULT NULL,
+  `intentos` int(11) DEFAULT 0,
+  `mensaje_error` text,
+  `generado_por_ia` tinyint(1) DEFAULT 0,
+  `fecha_creacion` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// Asegurar que existan las claves en configuracion
+$claves_init = [
+    'linkedin_client_id' => '',
+    'linkedin_client_secret' => '',
+    'linkedin_access_token' => '',
+    'linkedin_refresh_token' => '',
+    'linkedin_token_expires' => '',
+    'linkedin_person_urn' => '',
+    'linkedin_posts_por_semana' => '3'
+];
+
+foreach ($claves_init as $c => $v) {
+    $db->exec("INSERT IGNORE INTO configuracion (clave, valor) VALUES ('$c', '$v')");
+}
+
+// Leer configuracion
+$cfg = [];
+$stmtC = $db->query("SELECT clave, valor FROM configuracion WHERE clave LIKE 'linkedin_%'");
+foreach ($stmtC->fetchAll() as $r) $cfg[$r['clave']] = $r['valor'];
+
+$token_valido = false;
+$dias_restantes = 0;
+if (!empty($cfg['linkedin_access_token']) && !empty($cfg['linkedin_token_expires'])) {
+    $expires = (int)$cfg['linkedin_token_expires'];
+    if ($expires > time()) {
+        $token_valido = true;
+        $dias_restantes = floor(($expires - time()) / 86400);
+    }
+}
+
+// Cargar productos y categorías
+$productos = $db->query("SELECT SKU_REF, NOMBRE, FOTO_PORTADA, PRECIO, CATEGORIA, DESCRIPCION, COLOR FROM productos WHERE ESTADO != 'inactivo' ORDER BY NOMBRE ASC LIMIT 1000")->fetchAll();
+$categorias = $db->query("SELECT DISTINCT CATEGORIA FROM productos WHERE CATEGORIA IS NOT NULL AND CATEGORIA != '' ORDER BY CATEGORIA ASC")->fetchAll(PDO::FETCH_COLUMN);
+
+$page_class = 'linkedin-module';
+include('../includes/header.php');
+
+function resolverRutaPublica($foto) {
+    if (!$foto || $foto === 'img/logo.png') return '../img/logo.png';
+    $clean = str_replace('\\', '/', $foto);
+    $idx = strpos(strtolower($clean), '/imagenes/');
+    if ($idx !== false) {
+        return '../uploads/articulos' . substr($clean, $idx);
+    }
+    if (strpos($clean, ':/') !== false) {
+        $parts = explode('/', $clean);
+        return '../uploads/articulos/imagenes/' . end($parts);
+    }
+    return (strpos($clean, 'uploads/') === 0) ? '../' . $clean : '../uploads/' . $clean;
+}
+?>
+
+<style>
+/* DISEÑO PREMIUM TOTAL - VERSIÓN 7 (LinkedIn Blue Theme) */
+:root {
+    --linkedin-blue: #0A66C2;
+    --linkedin-dark: #001a33;
+    --accent-gold: #d4af37;
+    --accent-green: #10b981;
+    --border-glass: rgba(255, 255, 255, 0.1);
+    --text-gray: #aaa;
+    --text-white: #fff;
+    --bg-dark: #001a33;
+}
+
+body { background-color: var(--bg-dark) !important; color: var(--text-white); font-family: 'Segoe UI', Roboto, sans-serif; }
+
+.panel-management { padding: 30px; min-height: 100vh; max-width: 1400px; margin: 0 auto; }
+.panel-header-wow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 1rem; }
+.panel-header-wow h1 { font-size: 1.8rem; font-weight: 800; color: var(--text-white); margin: 0; }
+
+.btn-premium-wow { padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 10px; transition: all 0.3s; color: #000 !important; background: var(--accent-gold); text-decoration: none; font-size: 0.95rem; }
+.btn-premium-wow:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(212, 175, 55, 0.3); }
+
+.nav-tabs-wow { display: flex; gap: 12px; margin-bottom: 2.5rem; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 14px; border: 1px solid var(--border-glass); width: fit-content; }
+.tab-link-wow { padding: 10px 22px; color: var(--text-gray); cursor: pointer; border-radius: 10px; transition: all 0.3s; font-weight: 700; }
+.tab-link-wow.active { background: var(--accent-gold); color: #000; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2); }
+
+.config-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 2rem; }
+.config-card { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-glass); border-radius: 20px; padding: 2rem; height: fit-content; }
+.config-card h3 { margin-top: 0; margin-bottom: 1.5rem; color: var(--accent-gold); border-bottom: 1px solid rgba(212, 175, 55, 0.2); padding-bottom: 10px; }
+
+.nox-form-group { margin-bottom: 1.8rem; }
+.nox-form-group label { display: block; margin-bottom: 10px; color: var(--text-gray); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; }
+.input-wow { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); color: #fff; padding: 14px; border-radius: 10px; outline: none; box-sizing: border-box; }
+.input-wow:focus { border-color: var(--accent-gold); background: rgba(0,0,0,0.5); }
+
+/* Nuevo Selector con Vista Previa Mejorada */
+.selector-with-preview { display: flex; gap: 15px; align-items: center; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--border-glass); }
+#sku-quick-preview { width: 70px; height: 70px; min-width: 70px; border: 2px solid var(--accent-gold); border-radius: 10px; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(212,175,55,0.2); }
+#sku-preview-img { width: 100%; height: 100%; object-fit: cover; }
+
+.img-preview-container { background: #000; border-radius: 15px; margin-top: 15px; border: 1px solid var(--border-glass); min-height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.img-preview { max-width: 100%; max-height: 400px; object-fit: contain; display: none; }
+
+.badge-status { padding: 5px 14px; border-radius: 30px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+.badge-green { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+.badge-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; }
+.badge-orange { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid #f59e0b; }
+
+.tab-container { display: none; animation: fadeIn 0.4s ease-out; }
+.tab-container.active { display: block; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.char-counter { text-align: right; font-size: 0.75rem; color: var(--text-gray); margin-top: 8px; font-weight: 600; }
+.mode-toggle { display: flex; gap: 10px; margin-bottom: 2rem; }
+.mode-btn { padding: 10px 20px; border-radius: 10px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.04); color: var(--text-gray); cursor: pointer; font-weight: 800; font-size: 0.85rem; transition: all 0.3s; }
+.mode-btn.active { background: var(--accent-gold); color: #000; border-color: var(--accent-gold); }
+
+/* Estilos Tabla */
+.table-wow { width: 100%; border-collapse: separate; border-spacing: 0 8px; margin-top: -8px; }
+.table-wow th { padding: 15px; text-align: left; color: var(--text-gray); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+.table-wow tbody tr { background: rgba(255,255,255,0.02); transition: all 0.3s; }
+.table-wow tbody tr:hover { background: rgba(255,255,255,0.05); transform: scale(1.005); }
+.table-wow td { padding: 15px; border-top: 1px solid var(--border-glass); border-bottom: 1px solid var(--border-glass); }
+.table-wow td:first-child { border-left: 1px solid var(--border-glass); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+.table-wow td:last-child { border-right: 1px solid var(--border-glass); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
+
+.badge-type { padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+.type-manual { background: #374151; color: #fff; }
+.type-producto { background: var(--accent-gold); color: #000; }
+.type-marca { background: var(--linkedin-blue); color: white; }
+.type-behind_scenes { background: #10b981; color: white; }
+.type-promocion { background: #f59e0b; color: white; }
+
+#spinner-ia { display: none; align-items: center; gap: 10px; color: var(--accent-gold); margin-top: 15px; font-weight: bold; background: rgba(212,175,55,0.1); padding: 12px; border-radius: 10px; justify-content: center; }
+
+/* Modal */
+.modal-overlay-wow { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.modal-content-wow { background: #111; border: 1px solid var(--accent-gold); border-radius: 20px; width: 90%; max-width: 600px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.modal-header-wow { padding: 20px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; }
+.modal-header-wow h2 { margin: 0; color: var(--accent-gold); }
+
+.stat-card { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-glass); border-radius: 12px; padding: 1.2rem 1.5rem; flex: 1; min-width: 160px; text-align: center; }
+.stat-card .stat-num { font-size: 2rem; font-weight: 800; color: var(--accent-gold); }
+.stat-card .stat-lbl { font-size: .8rem; color: var(--text-gray); margin-top: 4px; }
+
+@media (max-width: 768px) { .config-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="panel-management">
+    <div class="panel-header-wow">
+        <h1 style="display:flex; align-items:center; gap:12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="#0A66C2">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037 -1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046 c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286z M5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            </svg>
+            LinkedIn Publisher
+        </h1>
+        <button onclick="publicarPendientes()" class="btn-premium-wow" style="background:var(--linkedin-blue);">
+            <i class="fas fa-paper-plane"></i> Publicar pendientes de hoy
+        </button>
+    </div>
+
+    <div id="resultado" style="display:none;"></div>
+
+    <div class="nav-tabs-wow">
+        <div class="tab-link-wow active" onclick="switchTab('tab-redactor', this)">✍️ Redactor</div>
+        <div class="tab-link-wow" onclick="switchTab('tab-cola', this)">📋 Cola de Posts</div>
+        <div class="tab-link-wow" onclick="switchTab('tab-stats', this)">📊 Estadísticas</div>
+        <div class="tab-link-wow" onclick="switchTab('tab-config', this)">⚙️ Configuración</div>
+    </div>
+
+    <!-- PESTAÑA 1: CONFIGURACIÓN -->
+    <div id="tab-config" class="tab-container">
+        <div class="config-grid">
+            <div class="config-card">
+                <h3>Credenciales OAuth</h3>
+                <div class="nox-form-group">
+                    <label>Client ID de LinkedIn</label>
+                    <input type="text" id="li_client_id" class="input-wow" style="width:100%" value="<?php echo htmlspecialchars($cfg['linkedin_client_id']); ?>">
+                </div>
+                <div class="nox-form-group">
+                    <label>Client Secret de LinkedIn</label>
+                    <input type="password" id="li_client_secret" class="input-wow" style="width:100%" value="<?php echo htmlspecialchars($cfg['linkedin_client_secret']); ?>">
+                </div>
+                <div class="nox-form-group">
+                    <label>Posts por semana (Recomendado: 3-5)</label>
+                    <input type="number" id="li_pps" class="input-wow" style="width:100%" value="<?php echo (int)$cfg['linkedin_posts_por_semana']; ?>">
+                </div>
+                
+                <div style="margin: 1.5rem 0;">
+                    <label style="display:block; margin-bottom:8px; color:var(--text-gray);">Estado del Token:</label>
+                    <?php if (!$token_valido): ?>
+                        <span class="badge-status badge-red">❌ Sin token</span>
+                    <?php elseif ($dias_restantes < 10): ?>
+                        <span class="badge-status badge-orange">⚠️ Expira pronto (<?php echo $dias_restantes; ?> días)</span>
+                    <?php else: ?>
+                        <span class="badge-status badge-green">✅ Token activo (expira en <?php echo $dias_restantes; ?> días)</span>
+                    <?php endif; ?>
+                    
+                    <?php if (!empty($cfg['linkedin_token_expires'])): ?>
+                        <div style="font-size:0.75rem; color:var(--text-gray); margin-bottom:1rem;">
+                            Vence el: <?php echo date('d/m/Y H:i', (int)$cfg['linkedin_token_expires']); ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button onclick="guardarCredenciales()" class="btn-premium-wow btn-gold">💾 Guardar credenciales</button>
+                    <button onclick="autorizarLinkedIn()" class="btn-linkedin">
+                        <i class="fab fa-linkedin"></i> Autorizar con LinkedIn
+                    </button>
+                    <?php if (!empty($cfg['linkedin_refresh_token'])): ?>
+                        <button onclick="renovarToken()" class="btn-premium-wow" style="background:#4b5563">🔄 Renovar token</button>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="config-card">
+                <h3>Info de cuenta</h3>
+                <div style="text-align:center; padding:1rem; border-bottom:1px solid var(--border-glass); margin-bottom:1.5rem;">
+                    <button onclick="verificarCuenta()" class="btn-premium-wow" style="margin-bottom:1rem;">👤 Verificar cuenta</button>
+                    <div id="perfil-info" style="color:var(--text-gray); font-size:0.9rem;">
+                        <?php if (!empty($cfg['linkedin_person_urn'])): ?>
+                            <p><strong>URN detectada:</strong> <br><code><?php echo htmlspecialchars($cfg['linkedin_person_urn']); ?></code></p>
+                        <?php else: ?>
+                            <p>No se ha verificado la cuenta todavía.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <div style="font-size:0.85rem; color:var(--text-gray);">
+                    <h4 style="color:var(--text-white); margin-bottom:8px;">Instrucciones de configuración:</h4>
+                    <ol style="padding-left:1.2rem; line-height:1.6;">
+                        <li>Ir a <a href="https://linkedin.com/developers" target="_blank" style="color:var(--accent-gold)">linkedin.com/developers</a></li>
+                        <li>Crear app y añadir productos "Share on LinkedIn" y "Sign In with LinkedIn using OpenID Connect".</li>
+                        <li>En la pestaña <strong>Auth</strong>: copiar Client ID y Client Secret.</li>
+                        <li>Registrar este Redirect URI: <br><code style="word-break:break-all;">https://noxertez.com/Sahtout/api/linkedin_oauth.php</code></li>
+                        <li>Guardar aquí y pulsar "Autorizar con LinkedIn".</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA 2: REDACTOR -->
+    <div id="tab-redactor" class="tab-container active">
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setModoRedactor('manual', this)">✍️ Manual</button>
+            <button class="mode-btn" onclick="setModoRedactor('ia', this)">🤖 Con IA</button>
+        </div>
+
+        <div class="config-grid">
+            <!-- Columna Formulario -->
+            <div class="config-card">
+                <div id="form-manual">
+                    <div class="nox-form-group">
+                        <label>Tipo de post</label>
+                        <select id="li_tipo" class="input-wow" style="width:100%" onchange="checkTipoProducto()">
+                            <option value="manual">Otro / General</option>
+                            <option value="producto">Producto</option>
+                            <option value="marca">Marca / Historia</option>
+                            <option value="behind_scenes">Behind the scenes</option>
+                            <option value="promocion">Promoción</option>
+                        </select>
+                    </div>
+
+                    <div class="nox-form-group" id="group-producto" style="display:none;">
+                        <label>Filtrar por Categoría</label>
+                        <select id="li_filtro_cat" class="input-wow" style="width:100%; margin-bottom:10px;" onchange="filtrarProductosSelector()">
+                            <option value="">-- Todas las categorías --</option>
+                            <?php foreach ($categorias as $cat): ?>
+                                <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        
+                        <label>Buscar Producto</label>
+                        <input type="text" id="li_filtro_txt" class="input-wow" style="width:100%; margin-bottom:10px;" placeholder="Escribe para buscar..." oninput="filtrarProductosSelector()">
+
+                        <label>Seleccionar Producto</label>
+                        <div class="selector-with-preview">
+                            <select id="li_sku" class="input-wow" style="flex:1; min-width:0;" onchange="cargarDatosProducto(this.value)">
+                                <option value="">-- Elige un producto --</option>
+                                <?php foreach ($productos as $p): ?>
+                                    <option value="<?php echo htmlspecialchars($p['SKU_REF']); ?>" 
+                                            data-nombre="<?php echo htmlspecialchars($p['NOMBRE']); ?>"
+                                            data-categoria="<?php echo htmlspecialchars($p['CATEGORIA']); ?>"
+                                            data-foto="<?php echo htmlspecialchars(resolverRutaPublica($p['FOTO_PORTADA'])); ?>">
+                                        <?php echo htmlspecialchars($p['SKU_REF'] . ' - ' . $p['NOMBRE']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div id="sku-quick-preview">
+                                <img id="sku-preview-img" src="" style="display:none;">
+                                <span id="sku-preview-placeholder">SIN FOTO</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="ia-options" style="display:none;">
+                        <div class="nox-form-group">
+                            <label>Instrucciones adicionales para Gemini</label>
+                            <textarea id="li_ia_contexto" class="input-wow" style="width:100%" rows="3" placeholder="Ej: Menciona que es para el día del padre..."></textarea>
+                        </div>
+                        <div class="nox-form-group">
+                            <label>Tono</label>
+                            <select id="li_ia_tono" class="input-wow" style="width:100%">
+                                <option value="Profesional">Profesional</option>
+                                <option value="Cercano">Cercano</option>
+                                <option value="Inspirador">Inspirador</option>
+                                <option value="Informativo">Informativo</option>
+                            </select>
+                        </div>
+                        <button onclick="generarConIA()" class="btn-premium-wow btn-gold" style="width:100%; justify-content:center;">
+                            <i class="fas fa-robot"></i> 🤖 Generar con Gemini
+                        </button>
+                        <div id="spinner-ia"><i class="fas fa-circle-notch fa-spin"></i> Pensando con Gemini...</div>
+                    </div>
+
+                    <div class="nox-form-group" style="margin-top:1.5rem;">
+                        <label>Texto del post</label>
+                        <textarea id="li_texto" class="input-wow" style="width:100%" rows="8" maxlength="3000" oninput="actualizarContador()"></textarea>
+                        <div class="char-counter"><span id="char-count">0</span>/3000</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Multimedia y Acciones -->
+            <div class="config-card">
+                <div class="nox-form-group">
+                    <label>URL de Imagen (Opcional)</label>
+                    <input type="text" id="li_imagen_url" class="input-wow" style="width:100%" placeholder="https://..." oninput="previewImagen(this.value)">
+                    <div class="img-preview-container">
+                        <img id="img-preview" class="img-preview">
+                        <div id="img-preview-empty" style="color:var(--text-gray); font-size:0.8rem;">Vista previa de la imagen</div>
+                    </div>
+                </div>
+                
+                <div class="nox-form-group">
+                    <label>Enlace (Opcional)</label>
+                    <input type="text" id="li_enlace" class="input-wow" style="width:100%" placeholder="https://noxertez.com/...">
+                </div>
+
+                <div class="nox-form-group">
+                    <label>Programar para:</label>
+                    <input type="datetime-local" id="li_fecha" class="input-wow" style="width:100%" value="<?php echo date('Y-m-d\TH:i'); ?>">
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px; margin-top:2rem;">
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="guardarPost('borrador')" class="btn-premium-wow" style="flex:1; background:#4b5563;">💾 Guardar borrador</button>
+                        <button onclick="guardarPost('pendiente')" class="btn-premium-wow btn-gold" style="flex:1;">📅 Programar</button>
+                    </div>
+                    <button onclick="publicarAhora()" class="btn-premium-wow" style="background:var(--linkedin-blue);">
+                        <i class="fas fa-play"></i> ▶ Publicar ahora
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PESTAÑA 3: COLA DE POSTS -->
+    <div id="tab-cola" class="tab-container">
+        <div style="display:flex; gap:10px; margin-bottom:1.5rem; flex-wrap:wrap; align-items:center;">
+            <select id="filtro-estado" class="input-wow" onchange="cargarCola()">
+                <option value="">Todos los estados</option>
+                <option value="borrador">Borrador</option>
+                <option value="pendiente">Pendiente</option>
+                <option value="publicado">Publicado</option>
+                <option value="error">Error</option>
+            </select>
+            <input type="text" id="busq-cola" class="input-wow" placeholder="Buscar..." oninput="cargarCola()">
+            <button onclick="cargarCola()" class="btn-premium-wow"><i class="fas fa-sync"></i></button>
+        </div>
+
+        <div class="table-container-wow scroll-x-wow">
+            <table class="table-wow">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Preview</th>
+                        <th>Imagen</th>
+                        <th>F. Programada</th>
+                        <th>Estado</th>
+                        <th>IA</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-cola">
+                    <!-- Se carga via AJAX -->
+                </tbody>
+            </table>
+        </div>
+        <div id="paginacion-cola" style="margin-top:1rem; display:flex; gap:5px; justify-content:center;"></div>
+    </div>
+
+    <!-- PESTAÑA 4: ESTADÍSTICAS -->
+    <div id="tab-stats" class="tab-container">
+        <div style="display:flex; gap:1rem; margin-bottom:2rem; flex-wrap:wrap;" id="stats-cards">
+            <!-- Cargado via AJAX -->
+        </div>
+
+        <div class="config-grid">
+            <div class="config-card">
+                <h3>📅 Próximos 14 días</h3>
+                <div id="calendario-stats"></div>
+            </div>
+            <div class="config-card">
+                <h3>🔗 Últimos publicados</h3>
+                <div id="ultimos-publicados"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDITAR -->
+<div id="modal-edit" class="modal-overlay-wow" style="display:none;" onclick="if(event.target==this)this.style.display='none'">
+    <div class="modal-content-wow" style="max-width:600px;">
+        <div class="modal-header-wow">
+            <h2>Editar Post</h2>
+            <button onclick="document.getElementById('modal-edit').style.display='none'">&times;</button>
+        </div>
+        <div style="padding:1.5rem;">
+            <input type="hidden" id="edit-id">
+            <div class="nox-form-group">
+                <label>Texto</label>
+                <textarea id="edit-texto" class="input-wow" style="width:100%" rows="6"></textarea>
+            </div>
+            <div class="nox-form-group">
+                <label>Fecha Programada</label>
+                <input type="datetime-local" id="edit-fecha" class="input-wow" style="width:100%">
+            </div>
+            <div class="nox-form-group">
+                <label>URL Imagen</label>
+                <input type="text" id="edit-imagen" class="input-wow" style="width:100%">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:1rem;">
+                <button onclick="guardarEdicion()" class="btn-premium-wow btn-gold" style="flex:1;">💾 Guardar Cambios</button>
+                <button onclick="document.getElementById('modal-edit').style.display='none'" class="btn-premium-wow" style="background:#4b5563; flex:1;">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const BASE_PATH = '../';
+let modoActual = 'manual';
+let paginaActual = 1;
+
+function resolverRutaJS(foto) {
+    if (!foto || foto === 'img/logo.png') return BASE_PATH + 'img/logo.png';
+    const clean = foto.replace(/\\/g, '/');
+    
+    if (/^[a-zA-Z]:\//.test(clean)) {
+        const idx = clean.toLowerCase().indexOf('uploads/');
+        if (idx !== -1) return BASE_PATH + clean.substring(idx);
+        const idxImg = clean.toLowerCase().indexOf('/imagenes/');
+        if (idxImg !== -1) return BASE_PATH + 'uploads/articulos' + clean.substring(idxImg);
+        return BASE_PATH + 'uploads/articulos/imagenes/' + clean.split('/').pop();
+    }
+    
+    if (clean.startsWith('uploads/')) return BASE_PATH + clean;
+    return BASE_PATH + 'uploads/' + clean;
+}
+
+function switchTab(id, el) {
+    document.querySelectorAll('.tab-container').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-link-wow').forEach(l => l.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    el.classList.add('active');
+    
+    if (id === 'tab-cola') cargarCola();
+    if (id === 'tab-stats') cargarStats();
+}
+
+function setModoRedactor(modo, el) {
+    modoActual = modo;
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('ia-options').style.display = (modo === 'ia') ? 'block' : 'none';
+}
+
+function checkTipoProducto() {
+    const tipo = document.getElementById('li_tipo').value;
+    document.getElementById('group-producto').style.display = (tipo === 'producto') ? 'block' : 'none';
+}
+
+function filtrarProductosSelector() {
+    const cat = document.getElementById('li_filtro_cat').value.toLowerCase();
+    const txt = document.getElementById('li_filtro_txt').value.toLowerCase();
+    const select = document.getElementById('li_sku');
+    const options = select.options;
+
+    for (let i = 1; i < options.length; i++) {
+        const option = options[i];
+        const optCat = (option.dataset.categoria || '').toLowerCase();
+        const optTxt = option.text.toLowerCase();
+        
+        const matchCat = !cat || optCat === cat;
+        const matchTxt = !txt || optTxt.includes(txt);
+        
+        option.style.display = (matchCat && matchTxt) ? 'block' : 'none';
+    }
+}
+
+function cargarDatosProducto(sku) {
+    if (!sku) {
+        document.getElementById('sku-preview-img').style.display = 'none';
+        document.getElementById('sku-preview-placeholder').style.display = 'block';
+        return;
+    }
+    const opt = document.querySelector(`#li_sku option[value="${sku}"]`);
+    const nombre = opt.dataset.nombre;
+    const foto_raw = opt.dataset.foto;
+    
+    if (modoActual === 'manual') {
+        document.getElementById('li_texto').value = `Presentamos nuestro ${nombre}. Hecho a mano con madera natural. #Noxertez #Artesania`;
+        actualizarContador();
+    }
+    
+    if (foto_raw) {
+        const foto_final = resolverRutaJS(foto_raw);
+        document.getElementById('li_imagen_url').value = foto_final;
+        previewImagen(foto_final);
+        
+        const quickImg = document.getElementById('sku-preview-img');
+        const quickPh = document.getElementById('sku-preview-placeholder');
+        quickImg.src = foto_final;
+        quickImg.style.display = 'block';
+        quickPh.style.display = 'none';
+    } else {
+        document.getElementById('sku-preview-img').style.display = 'none';
+        document.getElementById('sku-preview-placeholder').style.display = 'block';
+    }
+}
+
+function previewImagen(url) {
+    const img = document.getElementById('img-preview');
+    const empty = document.getElementById('img-preview-empty');
+    if (url) {
+        img.src = url;
+        img.style.display = 'block';
+        if(empty) empty.style.display = 'none';
+    } else {
+        img.style.display = 'none';
+        if(empty) empty.style.display = 'block';
+    }
+}
+
+function actualizarContador() {
+    const n = document.getElementById('li_texto').value.length;
+    const el = document.getElementById('char-count');
+    el.textContent = n;
+    el.style.color = (n > 2800) ? '#ef4444' : 'var(--text-gray)';
+}
+
+function mostrarResultado(msg, tipo) {
+    const el = document.getElementById('resultado');
+    const colores = {
+        ok:    { bg:'rgba(16,185,129,0.15)', border:'#10b981', color:'#10b981' },
+        error: { bg:'rgba(239,68,68,0.15)',  border:'#ef4444', color:'#ef4444' },
+        info:  { bg:'rgba(212,175,55,0.15)', border:'var(--accent-gold)', color:'var(--accent-gold)' }
+    };
+    const c = colores[tipo] || colores.info;
+    el.style.cssText = `display:block; background:${c.bg}; border:1px solid ${c.border}; color:${c.color}; padding:12px 16px; border-radius:8px; margin-bottom:1rem; font-weight:bold;`;
+    el.innerHTML = msg;
+    setTimeout(() => { el.style.display = 'none'; }, 5000);
+}
+
+async function guardarCredenciales() {
+    const data = { client_id: document.getElementById('li_client_id').value, client_secret: document.getElementById('li_client_secret').value, pps: document.getElementById('li_pps').value };
+    try {
+        const r = await fetch('../api/linkedin_oauth.php?accion=save_config', { method: 'POST', body: JSON.stringify(data) });
+        const d = await r.json();
+        if (d.ok) { mostrarResultado('✅ Credenciales guardadas', 'ok'); setTimeout(() => location.reload(), 1000); } 
+        else mostrarResultado('❌ ' + d.error, 'error');
+    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
+}
+
+function autorizarLinkedIn() { window.location.href = '../api/linkedin_oauth.php?step=1'; }
+
+async function renovarToken() {
+    try {
+        const r = await fetch('../api/linkedin_oauth.php?accion=refresh');
+        const d = await r.json();
+        if (d.ok) { mostrarResultado('✅ Token renovado', 'ok'); setTimeout(() => location.reload(), 1000); } 
+        else mostrarResultado('❌ ' + d.error, 'error');
+    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
+}
+
+async function verificarCuenta() {
+    try {
+        const r = await fetch('../api/linkedin_oauth.php?accion=verify');
+        const d = await r.json();
+        if (d.ok) {
+            document.getElementById('perfil-info').innerHTML = `<div style="display:flex; align-items:center; gap:10px; justify-content:center;"><img src="${d.profile.picture || ''}" style="width:40px; height:40px; border-radius:50%;"><strong>${d.profile.name}</strong></div><p>URN: <code>${d.profile.sub}</code></p>`;
+            mostrarResultado('✅ Cuenta verificada y URN actualizada', 'ok');
+        } else mostrarResultado('❌ ' + d.error, 'error');
+    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
+}
+
+async function generarConIA() {
+    const tipo = document.getElementById('li_tipo').value;
+    const sku = document.getElementById('li_sku').value;
+    const contexto = document.getElementById('li_ia_contexto').value;
+    const tono = document.getElementById('li_ia_tono').value;
+    document.getElementById('spinner-ia').style.display = 'flex';
+    try {
+        const r = await fetch('../api/linkedin_generate.php', { method: 'POST', body: JSON.stringify({ tipo, sku_ref: sku, contexto, tono }) });
+        const d = await r.json();
+        if (d.ok) { document.getElementById('li_texto').value = d.texto; actualizarContador(); mostrarResultado('✅ Texto generado con Gemini', 'ok'); } 
+        else mostrarResultado('❌ ' + d.error, 'error');
+    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
+    document.getElementById('spinner-ia').style.display = 'none';
+}
+
+async function guardarPost(estado) {
+    const data = { tipo: document.getElementById('li_tipo').value, sku_ref: document.getElementById('li_sku').value, texto: document.getElementById('li_texto').value, imagen_url: document.getElementById('li_imagen_url').value, enlace: document.getElementById('li_enlace').value, fecha_programada: document.getElementById('li_fecha').value, estado: estado, ia: (modoActual === 'ia' ? 1 : 0) };
+    if (!data.texto) return mostrarResultado('⚠️ Escribe el texto del post', 'error');
+    try {
+        const r = await fetch('../api/linkedin_publish.php?accion=save', { method: 'POST', body: JSON.stringify(data) });
+        const d = await r.json();
+        if (d.ok) { mostrarResultado('✅ Post guardado en la cola', 'ok'); resetForm(); } 
+        else mostrarResultado('❌ ' + d.error, 'error');
+    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
+}
+
+async function publicarAhora() {
+    const texto = document.getElementById('li_texto').value;
+    if (!texto) return mostrarResultado('⚠️ Escribe el texto del post', 'error');
+    if (!confirm('¿Publicar este post ahora mismo en LinkedIn?')) return;
+    mostrarResultado('🚀 Publicando...', 'info');
+    const data = { tipo: document.getElementById('li_tipo').value, sku_ref: document.getElementById('li_sku').value, texto: texto, imagen_url: document.getElementById('li_imagen_url').value, enlace: document.getElementById('li_enlace').value, ia: (modoActual === 'ia' ? 1 : 0) };
+    try {
+        const r = await fetch('../api/linkedin_publish.php?accion=publish_now', { method: 'POST', body: JSON.stringify(data) });
+        const d = await r.json();
+        if (d.ok) { mostrarResultado('✅ ¡Publicado con éxito!', 'ok'); resetForm(); } 
+        else mostrarResultado('❌ ' + d.error, 'error');
+    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
+}
+
+function resetForm() {
+    document.getElementById('li_texto').value = '';
+    document.getElementById('li_imagen_url').value = '';
+    document.getElementById('li_enlace').value = '';
+    document.getElementById('img-preview').style.display = 'none';
+    actualizarContador();
+}
+
+async function cargarCola(pag = 1) {
+    paginaActual = pag;
+    const estado = document.getElementById('filtro-estado').value;
+    const busq = document.getElementById('busq-cola').value;
+    try {
+        const r = await fetch(`../api/linkedin_publish.php?accion=list&pag=${pag}&estado=${estado}&busq=${busq}`);
+        const d = await r.json();
+        const tbody = document.getElementById('tbody-cola');
+        tbody.innerHTML = '';
+        if (d.items.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; opacity:0.5;">No hay posts en la cola.</td></tr>'; return; }
+        d.items.forEach(i => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><span class="badge-type type-${i.tipo}">${i.tipo}</span></td><td title="${i.texto}">${i.texto.substring(0, 50)}...</td><td>${i.imagen_url ? `<img src="${i.imagen_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">` : '—'}</td><td>${i.fecha_programada || '—'}</td><td><span class="badge-status badge-${getEstadoColor(i.estado)}">${i.estado}</span></td><td>${i.generado_por_ia == 1 ? '🤖' : '👤'}</td><td><div style="display:flex; gap:5px;"><button onclick="editarPost(${i.id})" class="btn-premium-wow" style="padding:4px 8px;"><i class="fas fa-edit"></i></button><button onclick="borrarPost(${i.id})" class="btn-premium-wow" style="padding:4px 8px; background:#ef4444;"><i class="fas fa-trash"></i></button>${i.estado !== 'publicado' ? `<button onclick="publicarIndividual(${i.id})" class="btn-premium-wow" style="padding:4px 8px; background:var(--linkedin-blue);"><i class="fas fa-play"></i></button>` : ''}</div></td>`;
+            tbody.appendChild(tr);
+        });
+        const pagEl = document.getElementById('paginacion-cola');
+        pagEl.innerHTML = '';
+        for (let p = 1; p <= d.total_paginas; p++) {
+            const b = document.createElement('button'); b.textContent = p; b.className = 'btn-premium-wow' + (p === pag ? ' btn-gold' : ''); b.onclick = () => cargarCola(p); pagEl.appendChild(b);
+        }
+    } catch(e) { console.error(e); }
+}
+
+function getEstadoColor(est) { if (est === 'publicado') return 'green'; if (est === 'pendiente') return 'orange'; if (est === 'error') return 'red'; return 'gray'; }
+async function borrarPost(id) { if (!confirm('¿Eliminar este post de la cola?')) return; try { const r = await fetch(`../api/linkedin_publish.php?accion=delete&id=${id}`); const d = await r.json(); if (d.ok) cargarCola(paginaActual); } catch(e) { console.error(e); } }
+async function publicarIndividual(id) { if (!confirm('¿Publicar este post ahora?')) return; try { const r = await fetch(`../api/linkedin_publish.php?accion=publish_one&id=${id}`); const d = await r.json(); if (d.ok) { mostrarResultado('✅ ¡Publicado!', 'ok'); cargarCola(paginaActual); } else mostrarResultado('❌ ' + d.error, 'error'); } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); } }
+async function cargarStats() { try { const r = await fetch('../api/linkedin_publish.php?accion=stats'); const d = await r.json(); if (d.ok) { const cards = document.getElementById('stats-cards'); cards.innerHTML = `<div class="stat-card"><div class="stat-num">${d.stats.total}</div><div class="stat-lbl">Total Posts</div></div><div class="stat-card"><div class="stat-num">${d.stats.publicados}</div><div class="stat-lbl">Publicados</div></div><div class="stat-card"><div class="stat-num">${d.stats.pendientes}</div><div class="stat-lbl">Pendientes</div></div><div class="stat-card"><div class="stat-num">${d.stats.errores}</div><div class="stat-lbl">Errores</div></div>`; } } catch(e) { console.error(e); } }
+</script>
