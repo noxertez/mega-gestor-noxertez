@@ -8,12 +8,13 @@
 require_once 'config.php';
 $db = conectar();
 
-// [ASEGURAR SCHEMA] Añadir columna sku_base si no existe en articulos
+// [ASEGURAR SCHEMA] Añadir columnas si no existen
 try {
     $db->query("ALTER TABLE articulos ADD COLUMN sku_base VARCHAR(100) NULL AFTER referencia");
-} catch (Exception $e) {
-    // Probablemente ya existe, ignoramos
-}
+} catch (Exception $e) {}
+try {
+    $db->query("ALTER TABLE articulos ADD COLUMN mockup TEXT NULL AFTER galeria");
+} catch (Exception $e) {}
 
 /**
  * Convierte una ruta local de Windows (C:\Users\...\imagenes\...\archivo.jpg)
@@ -30,6 +31,9 @@ function normalizar_ruta_imagen(string $ruta): string {
         // Asegurar que no tiene dobles barras
         return ltrim($clean, '/');
     }
+
+    // Si contiene repo_pc, lo quitamos para unificar todas las imágenes en la carpeta principal
+    $clean = str_ireplace('/repo_pc/', '/', $clean);
 
     // Buscar el marcador 'uploads/' dentro de la ruta
     $pos = stripos($clean, '/uploads/');
@@ -110,6 +114,7 @@ if ($metodo === 'GET') {
             p.STOCK_FISICO                    AS stock_fisico,
             p.FOTO_PORTADA                    AS foto_portada,
             p.GALERIA                         AS galeria,
+            p.MOCKUP                          AS mockup_origen,
             p.DESCRIPCION                     AS descripcion,
             p.ES_VARIANTE                     AS es_variante
         FROM productos p
@@ -123,12 +128,12 @@ if ($metodo === 'GET') {
         INSERT INTO articulos (
             referencia, sku_base, nombre, descripcion, precio, stock, 
             categoria, subcategoria, marca, color, dimensiones, 
-            foto_portada, galeria, activo, es_variante
+            foto_portada, galeria, mockup, activo, es_variante
         )
         VALUES (
             :ref, :sku_base, :nombre, :desc, :precio, :stock, 
             :cat, :subcat, :marca, :color, :dims, 
-            :foto, :gal, 1, :es_variante
+            :foto, :gal, :mockup, 1, :es_variante
         )
         ON DUPLICATE KEY UPDATE
             sku_base      = VALUES(sku_base),
@@ -143,6 +148,7 @@ if ($metodo === 'GET') {
             dimensiones   = VALUES(dimensiones),
             foto_portada  = VALUES(foto_portada),
             galeria       = VALUES(galeria),
+            mockup        = VALUES(mockup),
             es_variante   = VALUES(es_variante)
     ");
 
@@ -156,10 +162,22 @@ if ($metodo === 'GET') {
         // 1. Normalizar rutas para DB
         $foto_relativa = normalizar_ruta_imagen($p['foto_portada'] ?? '');
         $gal_relativa  = normalizar_ruta_imagen($p['galeria'] ?? '');
+        $mock_relativa = normalizar_ruta_imagen($p['mockup_origen'] ?? '');
 
         // 2. Intentar copiar archivos físicos al servidor (XAMPP)
         if (!empty($p['foto_portada'])) {
             asegurar_archivo_fisico($p['foto_portada'], $foto_relativa);
+        }
+
+        if (!empty($p['mockup_origen'])) {
+            // El campo mockup puede tener varias rutas separadas por comas
+            $mockups = explode(',', $p['mockup_origen']);
+            foreach ($mockups as $m) {
+                $m = trim($m);
+                if (empty($m)) continue;
+                $m_relativa = normalizar_ruta_imagen($m);
+                asegurar_archivo_fisico($m, $m_relativa);
+            }
         }
 
         if (!empty($p['galeria'])) {
@@ -189,6 +207,7 @@ if ($metodo === 'GET') {
                 'dims'        => $p['dimensiones'] ?? '',
                 'foto'        => $foto_relativa,
                 'gal'         => $gal_relativa,
+                'mockup'      => $mock_relativa,
                 'es_variante' => empty($p['es_variante']) ? 'BASE' : strtoupper($p['es_variante'])
             ]);
             $ok++;

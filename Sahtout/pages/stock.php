@@ -864,9 +864,12 @@ async function sincronizarProductos() {
                 res.style.color       = '#10b981';
                 res.innerHTML = `✅ ${data.mensaje}`;
 
-                // Ocultar badge y actualizar etiqueta
-                document.getElementById('badgePendientes').style.display = 'none';
-                document.getElementById('lblSync').textContent = 'Sincronizar desde Productos';
+                // Ocultar badge si existe y actualizar etiqueta
+                const badge = document.getElementById('badgePendientes');
+                if (badge) badge.style.display = 'none';
+                
+                const lbl = document.getElementById('lblSync');
+                if (lbl) lbl.textContent = 'Sincronizar desde Productos';
 
                 // Recargar la tabla tras 1.5 s para mostrar los nuevos artículos preserving state
                 setTimeout(() => {
