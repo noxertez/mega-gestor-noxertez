@@ -26,12 +26,14 @@ if ($metodo === 'GET') {
 
     $sql_base = "
         SELECT a.*, 
+               ft.nombre_interno as ficha_nombre,
                CAST(IFNULL(NULLIF(p.STOCK, 'NO'), 0) AS UNSIGNED) as stock_final,
                p.STOCK_FISICO as stock_semi,
                p.GALERIA as p_galeria,
                p.MOCKUP as p_mockup
         FROM articulos a 
         LEFT JOIN productos p ON a.referencia = p.SKU_REF 
+        LEFT JOIN fichas_tecnicas ft ON a.ficha_tecnica_id = ft.id
         WHERE a.activo = 1
     ";
     $where = []; $params = [];
@@ -106,6 +108,23 @@ if ($metodo === 'GET') {
 
 elseif ($metodo === 'POST') {
     $data = !empty($_POST) ? $_POST : $body;
+    $accion = $_GET['accion'] ?? $data['accion'] ?? '';
+
+    // Nueva acción: Vinculación masiva de fichas técnicas
+    if ($accion === 'bulk_ficha') {
+        $refs = $data['referencias'] ?? [];
+        $ficha_id = $data['ficha_id'] ?? null;
+        if (empty($refs)) { echo json_encode(['error' => 'No hay referencias seleccionadas']); exit; }
+        
+        $placeholders = implode(',', array_fill(0, count($refs), '?'));
+        $stmt = $db->prepare("UPDATE articulos SET ficha_tecnica_id = ? WHERE referencia IN ($placeholders)");
+        $params = array_merge([$ficha_id], $refs);
+        $stmt->execute($params);
+        
+        echo json_encode(['ok' => true, 'updated' => count($refs)]);
+        exit;
+    }
+
     $ref = trim($data['referencia'] ?? '');
     if (!$ref) { echo json_encode(['error' => 'Referencia obligatoria']); exit; }
 

@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-require_once __DIR__ . '/config.php';
+require_once 'config.php';
+require_once 'linkedin_prompts.php';
 $db = conectar();
 
 $accion = $_GET['accion'] ?? '';
@@ -49,6 +50,16 @@ function publicarPostLinkedIn($db, $post_data_db) {
 
     // 1. Si hay imagen, subirla primero
     if (!empty($imagen_url)) {
+        // Normalizar ruta para el servidor (si es local)
+        $local_path = $imagen_url;
+        if (strpos($imagen_url, 'noxertez.com/Sahtout/') !== false) {
+            $local_path = '../' . explode('Sahtout/', $imagen_url)[1];
+        } elseif (!preg_match('~^(?:f|ht)tps?://~i', $imagen_url)) {
+            // Si es una ruta relativa, asumimos que es desde la raíz del CMS
+            // Como estamos en /api/, bajamos un nivel
+            $local_path = '../' . ltrim($imagen_url, '/');
+        }
+
         // A. Initialize Upload
         $init_url = "https://api.linkedin.com/rest/images?action=initializeUpload";
         $init_body = [
@@ -74,7 +85,12 @@ function publicarPostLinkedIn($db, $post_data_db) {
             $media_urn = $init_res['value']['image'];
             
             // B. Upload Binary
-            $img_content = @file_get_contents($imagen_url);
+            $img_content = @file_get_contents($local_path);
+            if (!$img_content && $local_path !== $imagen_url) {
+                // Si fallo la ruta local, intentar con la URL original
+                $img_content = @file_get_contents($imagen_url);
+            }
+
             if ($img_content) {
                 $ch_up = curl_init($upload_url);
                 curl_setopt($ch_up, CURLOPT_RETURNTRANSFER, true);
@@ -118,7 +134,7 @@ function publicarPostLinkedIn($db, $post_data_db) {
     curl_setopt($ch_p, CURLOPT_POST, true);
     curl_setopt($ch_p, CURLOPT_HTTPHEADER, [
         "Authorization: Bearer $token",
-        "LinkedIn-Version: 202410",
+        "LinkedIn-Version: 202604",
         "X-Restli-Protocol-Version: 2.0.0",
         "Content-Type: application/json"
     ]);
@@ -139,6 +155,13 @@ function publicarPostLinkedIn($db, $post_data_db) {
     } else {
         return ['ok' => false, 'error' => "Error API ($http_code): " . $body];
     }
+}
+
+function marcarMockupUsado($db, $imagen_url) {
+    if (empty($imagen_url)) return;
+    $path = $imagen_url;
+    if (strpos($path, 'Sahtout/') !== false) $path = explode('Sahtout/', $path)[1];
+    $db->prepare("UPDATE mockups_varios SET publicado_linkedin = NOW(), veces_usado = veces_usado + 1, ultima_vez_usado = NOW() WHERE ruta = ? OR ruta = ?")->execute([$path, ltrim($path, '/')]);
 }
 
 // --- LOGICA DE ENDPOINTS ---
@@ -174,6 +197,7 @@ switch ($accion) {
                 $res['id'],
                 $input['ia'] ?? 0
             ]);
+            marcarMockupUsado($db, $input['imagen_url']);
             echo json_encode(['ok' => true, 'linkedin_id' => $res['id']]);
         } else {
             echo json_encode(['error' => $res['error']]);
@@ -226,6 +250,78 @@ switch ($accion) {
         echo json_encode(['ok' => true]);
         break;
 
+    case 'regenerate_ia':
+        $id = $_GET['id'] ?? 0;
+        $stmt = $db->prepare("SELECT * FROM linkedin_queue WHERE id = ?");
+        $stmt->execute([$id]);
+        $post = $stmt->fetch();
+        if (!$post) die(json_encode(['error' => 'Post no encontrado']));
+
+        // Recuperar contexto
+        $estancia = ''; $decoracion = ''; $info_prod = '';
+        
+        // 1. Info de producto
+        if ($post['sku_ref']) {
+            $stmtP = $db->prepare("SELECT NOMBRE, DESCRIPCION FROM productos WHERE SKU_REF = ?");
+            $stmtP->execute([$post['sku_ref']]);
+            $art = $stmtP->fetch();
+            if ($art) $info_prod = "Producto: " . $art['NOMBRE'] . ". " . $art['DESCRIPCION'];
+        }
+
+        // 2. Info de mockup (vía ruta de imagen)
+        if ($post['imagen_url']) {
+            $path = $post['imagen_url'];
+            // Si es URL absoluta, limpiar
+            if (strpos($path, 'Sahtout/') !== false) $path = explode('Sahtout/', $path)[1];
+            $stmtM = $db->prepare("SELECT estancia, estilo, luz FROM mockups_varios WHERE ruta = ? OR ruta = ?");
+            $stmtM->execute([$path, ltrim($path, '/')]);
+            $m = $stmtM->fetch();
+            if ($m) {
+                $estancia = $m['estancia'];
+                $decoracion = $m['estilo'] . " con luz " . $m['luz'];
+            }
+        }
+
+        $prompt = getNoxertezLinkedinPrompt([
+            'estancia' => $estancia,
+            'decoracion' => $decoracion,
+            'info_prod' => $info_prod,
+            'tono' => 'Profesional'
+        ]);
+
+        // Llamar a Gemini / Groq
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . GEMINI_API_KEY;
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(["contents" => [["parts" => [["text" => $prompt]]]]]));
+        $resp = json_decode(curl_exec($ch), true);
+        curl_close($ch);
+
+        $texto = "";
+        if (isset($resp['candidates'][0]['content']['parts'][0]['text'])) {
+            $texto = trim($resp['candidates'][0]['content']['parts'][0]['text']);
+        } else if (defined('GROQ_API_KEY')) {
+            // Fallback
+            $ch = curl_init("https://api.groq.com/openai/v1/chat/completions");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Authorization: Bearer ' . GROQ_API_KEY]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(["model" => "llama-3.3-70b-versatile", "messages" => [["role" => "user", "content" => $prompt]]]));
+            $gres = json_decode(curl_exec($ch), true);
+            curl_close($ch);
+            if (isset($gres['choices'][0]['message']['content'])) $texto = trim($gres['choices'][0]['message']['content']);
+        }
+
+        if ($texto) {
+            $db->prepare("UPDATE linkedin_queue SET texto = ?, generado_por_ia = 1 WHERE id = ?")->execute([$texto, $id]);
+            echo json_encode(['ok' => true, 'texto' => $texto]);
+        } else {
+            echo json_encode(['error' => 'No se pudo generar el texto']);
+        }
+        break;
+
     case 'delete':
         $id = $_GET['id'] ?? 0;
         $db->prepare("DELETE FROM linkedin_queue WHERE id = ?")->execute([$id]);
@@ -242,6 +338,7 @@ switch ($accion) {
         $res = publicarPostLinkedIn($db, $post);
         if ($res['ok']) {
             $db->prepare("UPDATE linkedin_queue SET estado = 'publicado', fecha_publicado = NOW(), linkedin_post_id = ? WHERE id = ?")->execute([$res['id'], $id]);
+            marcarMockupUsado($db, $post['imagen_url']);
             echo json_encode(['ok' => true]);
         } else {
             $intentos = $post['intentos'] + 1;
@@ -263,6 +360,7 @@ switch ($accion) {
             $res = publicarPostLinkedIn($db, $p);
             if ($res['ok']) {
                 $db->prepare("UPDATE linkedin_queue SET estado = 'publicado', fecha_publicado = NOW(), linkedin_post_id = ? WHERE id = ?")->execute([$res['id'], $p['id']]);
+                marcarMockupUsado($db, $p['imagen_url']);
                 $publicados++;
             } else {
                 $intentos = $p['intentos'] + 1;
@@ -295,3 +393,4 @@ switch ($accion) {
     default:
         echo json_encode(['error' => 'Acción no válida']);
 }
+?>

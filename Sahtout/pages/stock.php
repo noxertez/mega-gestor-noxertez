@@ -333,6 +333,11 @@ $current_tab = $_GET['tab'] ?? '5.1';
 
         <!-- Tabla (oculta hasta que se cargue una categoría) -->
         <div class="table-container-wow scroll-x-wow" id="contenedorTabla53" style="display:none;">
+            <!-- Scroll Espejo Superior -->
+            <div id="scrollEspejoSuperior" class="scroll-x-wow" style="overflow-x: auto; overflow-y: hidden; height: 20px; margin-bottom: 5px; display: none;">
+                <div id="divAnchoEspejo" style="height: 20px;"></div>
+            </div>
+            
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
                 <span id="infoConteo53" style="font-size:0.85rem; opacity:0.6;"></span>
             </div>
@@ -345,7 +350,8 @@ $current_tab = $_GET['tab'] ?? '5.1';
                         <th>Categoría</th>
                         <th>Stock (Final)</th>
                         <th>Stock (Semi)</th>
-                        <th>Calculado</th>
+                        <th>Calc. (BOM)</th>
+                        <th>Ficha</th>
                         <th style="min-width:110px;">INMEDIATA</th>
                         <th>Descargas</th>
                         <th>Acción</th>
@@ -642,6 +648,10 @@ async function cargarArticulosPorCategoria() {
             let img = resolverRuta(a.foto_portada);
             const tr = document.createElement('tr');
             tr.className = 'articulo-row';
+            
+            // Recopilar variantes para el dropdown si es un modelo base
+            const hasVariants = a.variantes && a.variantes.length > 0;
+            
             tr.innerHTML = `
                 <td><img src="${img}" class="img-mini-wow" onerror="this.src='${BASE_PATH}img/logo.png'"></td>
                 <td>${escH(a.referencia)}</td>
@@ -649,7 +659,8 @@ async function cargarArticulosPorCategoria() {
                 <td><span style="background:rgba(212,175,55,0.15); color:var(--accent-gold); padding:2px 8px; border-radius:20px; font-size:0.75rem;">${escH(a.categoria || '—')}</span></td>
                 <td class="${(a.stock_final == 0) ? 'st-zero' : 'st-final'}">${a.stock_final ?? 0} uds</td>
                 <td class="${(a.stock_semi == 0) ? 'st-zero' : 'st-semi'}">${a.stock_semi ?? 0} uds</td>
-                <td class="calc-stock" data-ref="${escH(a.referencia)}"><i class="fas fa-circle-notch" style="animation:spin 1s linear infinite; opacity:0.5;"></i></td>
+                <td class="calc-stock" data-ref="${escH(a.referencia)}">...</td>
+                <td style="font-size:0.8rem; color:var(--accent-gold);">${escH(a.ficha_nombre || '—')}</td>
                 <td>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <label class="switch-nox">
@@ -665,39 +676,39 @@ async function cargarArticulosPorCategoria() {
                         <button class="btn-mini" style="border-color:var(--accent-gold); color:var(--accent-gold);">
                             <i class="fas fa-download"></i> Descargas
                         </button>
-                        <div class="dropdown-content-multimedia" style="min-width: 220px;">
-                            <div class="dl-header">Modelo Base</div>
+                        <div class="dropdown-content-multimedia" style="min-width: 250px;">
+                            <div class="dl-header">Modelo Principal</div>
                             <div class="dl-row">
-                                <span class="dl-label">Principal</span>
+                                <span class="dl-label" style="font-weight:bold; color:var(--accent-gold);">Base</span>
                                 <div class="dl-icons">
-                                    <a href="api/index.php?ruta=stock&accion=descargar_ficha&ref=${a.referencia}&marca=${encodeURIComponent(a.marca)}&base=${encodeURIComponent(a.sku_base)}" target="_blank" class="dl-icon" title="Descargar Ficha">
+                                    <a href="api/index.php?ruta=stock&accion=descargar_ficha&ref=${a.referencia}&marca=${encodeURIComponent(a.marca)}&base=${encodeURIComponent(a.sku_base)}" target="_blank" class="dl-icon" title="Descargar Ficha Base">
                                         <i class="fas fa-file-pdf"></i>
                                     </a>
-                                    <a href="${img}" download="PORTADA_${a.referencia}.jpg" class="dl-icon" title="Descargar Foto">
+                                    <a href="${img}" download="PORTADA_${a.referencia}.jpg" class="dl-icon" title="Descargar Foto Base">
                                         <i class="fas fa-image"></i>
                                     </a>
-                                    <a href="${a.mockup ? resolverRuta(a.mockup) : '#'}" download="MOCKUP_${a.referencia}.jpg" class="dl-icon ${a.mockup ? '' : 'disabled'}" title="${a.mockup ? 'Descargar Mockup' : 'Sin Mockup'}">
+                                    <a href="${a.mockup ? resolverRuta(a.mockup) : '#'}" download="MOCKUP_${a.referencia}.jpg" class="dl-icon ${a.mockup ? '' : 'disabled'}" title="Descargar Mockup Base">
                                         <i class="fas fa-palette"></i>
                                     </a>
                                 </div>
                             </div>
                             
-                            ${(a.variantes && a.variantes.length > 0) ? `
-                                <div class="dl-header">Variantes (Colores)</div>
+                            ${hasVariants ? `
+                                <div class="dl-header">Colores / Variantes</div>
                                 ${a.variantes.map(v => {
-                                    const color = v.color || v.nombre.split(' ').pop();
+                                    const cName = v.color || (v.nombre ? v.nombre.split(' ').pop() : 'Alt');
                                     const vImg = resolverRuta(v.foto_portada);
                                     return `
                                     <div class="dl-row">
-                                        <span class="dl-label">${escH(color)}</span>
+                                        <span class="dl-label" title="${escH(v.nombre)}">${escH(cName)}</span>
                                         <div class="dl-icons">
-                                            <a href="api/index.php?ruta=stock&accion=descargar_ficha&ref=${v.referencia}&marca=${encodeURIComponent(a.marca)}&base=${encodeURIComponent(a.sku_base)}&color=${encodeURIComponent(color)}" target="_blank" class="dl-icon" title="Descargar Ficha">
+                                            <a href="api/index.php?ruta=stock&accion=descargar_ficha&ref=${v.referencia}&marca=${encodeURIComponent(a.marca)}&base=${encodeURIComponent(a.sku_base)}&color=${encodeURIComponent(cName)}" target="_blank" class="dl-icon" title="Ficha ${cName}">
                                                 <i class="fas fa-file-pdf"></i>
                                             </a>
-                                            <a href="${v.foto_portada ? vImg : '#'}" download="FOTO_${v.referencia}.jpg" class="dl-icon ${v.foto_portada ? '' : 'disabled'}" title="${v.foto_portada ? 'Descargar Foto' : 'Sin Foto'}">
+                                            <a href="${v.foto_portada ? vImg : '#'}" download="FOTO_${v.referencia}.jpg" class="dl-icon ${v.foto_portada ? '' : 'disabled'}" title="Foto ${cName}">
                                                 <i class="fas fa-image"></i>
                                             </a>
-                                            <a href="${v.mockup ? resolverRuta(v.mockup) : '#'}" download="MOCKUP_${v.referencia}.jpg" class="dl-icon ${v.mockup ? '' : 'disabled'}" title="${v.mockup ? 'Descargar Mockup' : 'Sin Mockup'}">
+                                            <a href="${v.mockup ? resolverRuta(v.mockup) : '#'}" download="MOCKUP_${v.referencia}.jpg" class="dl-icon ${v.mockup ? '' : 'disabled'}" title="Mockup ${cName}">
                                                 <i class="fas fa-palette"></i>
                                             </a>
                                         </div>
@@ -718,11 +729,6 @@ async function cargarArticulosPorCategoria() {
                             style="padding:0.4rem 0.6rem; font-size:0.75rem; background:#4b5563;" title="Editar Maestro">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button onclick="abrirModalBOM(this)" data-ref="${escH(a.referencia)}"
-                            class="btn-premium-wow"
-                            style="padding:0.4rem 0.6rem; font-size:0.75rem; background:#3b82f6;" title="Despiece">
-                        <i class="fas fa-link"></i>
-                    </button>
                 </td>`;
             tbody.appendChild(tr);
         });
@@ -732,6 +738,23 @@ async function cargarArticulosPorCategoria() {
         contenedor.style.display = 'block';
         busq.disabled = false;
         busq.value = '';
+
+        // Ajustar Doble Scroll
+        setTimeout(() => {
+            const wrapper = document.getElementById('contenedorTabla53');
+            const mirror = document.getElementById('scrollEspejoSuperior');
+            const mirrorDiv = document.getElementById('divAnchoEspejo');
+            const table = document.getElementById('tablaArticulos');
+            
+            if(table && mirror && mirrorDiv) {
+                mirror.style.display = 'block';
+                mirrorDiv.style.width = table.offsetWidth + 'px';
+                
+                // Sincronizar
+                mirror.onscroll = function() { wrapper.scrollLeft = mirror.scrollLeft; };
+                wrapper.onscroll = function() { mirror.scrollLeft = wrapper.scrollLeft; };
+            }
+        }, 300);
 
         // Cargar cálculos BOM para las filas visibles
         document.querySelectorAll('.calc-stock').forEach(td => {
@@ -2076,7 +2099,6 @@ async function asignarMaterialCelda() {
   const d = await r.json();
   if (d.ok) { alert(`✅ Material asignado a ${etiqueta}`); }
   else alert('Error al asignar');
-}
 </script>
 
 <?php include('../includes/footer.php'); ?>

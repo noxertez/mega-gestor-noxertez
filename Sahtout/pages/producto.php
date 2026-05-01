@@ -16,7 +16,12 @@ if (!$ref) {
 }
 
 // 1. Obtener detalles del producto actual
-$stmt = $db->prepare("SELECT * FROM articulos WHERE referencia = ? AND activo = 1");
+$stmt = $db->prepare("
+    SELECT a.*, ft.titulo_publico, ft.materiales, ft.elaboracion, ft.observaciones, ft.mantenimiento, ft.sostenibilidad 
+    FROM articulos a 
+    LEFT JOIN fichas_tecnicas ft ON a.ficha_tecnica_id = ft.id
+    WHERE a.referencia = ? AND a.activo = 1
+");
 $stmt->execute([$ref]);
 $producto = $stmt->fetch();
 
@@ -87,8 +92,11 @@ $main_img = resolver_ruta_img($producto['foto_portada'], $base_path);
 ?>
 
 <link rel="stylesheet" href="<?= $base_path ?>assets/css/producto_detalle.css?v=<?= time() ?>">
+<style>
+    body { background-color: #000 !important; margin: 0; padding: 0; }
+</style>
 
-<div class="product-detail-container">
+<div class="product-detail-container" style="background-color: #0f172a; color: #fff; min-height: 100vh; padding: 30px; margin: 20px auto; border-radius: 20px;">
     <nav style="margin-bottom: 20px; font-size: 0.9em;">
         <a href="<?= $base_path ?>pages/catalogo_publico.php" style="color: var(--gold); text-decoration: none;">&lt; Volver al Catálogo</a>
     </nav>
@@ -123,7 +131,7 @@ $main_img = resolver_ruta_img($producto['foto_portada'], $base_path);
         <!-- SECCIÓN DERECHA: INFO -->
         <div class="product-info-section">
             <span class="product-brand"><?= htmlspecialchars($producto['marca'] ?? 'Artesanía Noxertez') ?></span>
-            <h1 class="product-title"><?= htmlspecialchars($producto['nombre']) ?></h1>
+            <h1 class="product-title" style="color: #fff;"><?= htmlspecialchars($producto['nombre']) ?></h1>
             
             <div class="product-price">
                 <?= number_format($producto['precio'], 2) ?> €
@@ -139,6 +147,14 @@ $main_img = resolver_ruta_img($producto['foto_portada'], $base_path);
             <div class="product-description">
                 <?= nl2br(htmlspecialchars($producto['descripcion'])) ?>
             </div>
+
+            <?php if (!empty($producto['titulo_publico'])): ?>
+                <div class="technical-sheet-trigger" style="margin-top: 20px;">
+                    <button onclick="document.getElementById('modalTecnica').style.display='flex'" class="btn-premium-wow" style="background: rgba(212,175,55,0.1); border: 1px solid var(--accent-gold); color: var(--accent-gold); width: 100%; justify-content: center; padding: 12px; font-weight: bold; border-radius: 8px;">
+                        <i class="fas fa-certificate"></i> Ver Detalles de Calidad y Origen
+                    </button>
+                </div>
+            <?php endif; ?>
 
             <div class="product-actions">
                 <?php if (!empty($producto['trendiof_URL'])): ?>
@@ -173,6 +189,56 @@ $main_img = resolver_ruta_img($producto['foto_portada'], $base_path);
     </div>
     <?php endif; ?>
 </div>
+
+<!-- Modal Ficha Técnica -->
+<?php if (!empty($producto['titulo_publico'])): ?>
+<div id="modalTecnica" class="modal-fs" style="display: none; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(15px); z-index: 9999;">
+    <div style="max-width: 750px; margin: 40px auto; background: #1e293b; border: 2px solid #d4af37; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
+        <!-- Cabecera del Modal -->
+        <div style="padding: 25px; background: linear-gradient(90deg, rgba(212,175,55,0.2), transparent); border-bottom: 1px solid rgba(212,175,55,0.3); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; color: #d4af37; font-size: 1.8rem; font-family: 'Cinzel', serif; font-weight: 800; letter-spacing: 1px;"><?= htmlspecialchars($producto['titulo_publico']) ?></h2>
+            <span onclick="document.getElementById('modalTecnica').style.display='none'" style="cursor: pointer; font-size: 2.5rem; color: #fff; line-height: 1;">&times;</span>
+        </div>
+        
+        <!-- Cuerpo del Modal -->
+        <div style="padding: 35px; color: #f1f5f9; max-height: 65vh; overflow-y: auto; font-family: 'Quicksand', sans-serif;">
+            <div style="margin-bottom: 30px;">
+                <h4 style="color: #d4af37; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 2px; margin-bottom: 12px; font-weight: 700;"><i class="fas fa-tree" style="margin-right: 8px;"></i> Materiales Utilizados</h4>
+                <p style="opacity: 1; line-height: 1.8; font-size: 1.05rem;"><?= nl2br(htmlspecialchars($producto['materiales'])) ?></p>
+            </div>
+            
+            <div style="margin-bottom: 30px;">
+                <h4 style="color: #d4af37; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 2px; margin-bottom: 12px; font-weight: 700;"><i class="fas fa-hammer" style="margin-right: 8px;"></i> Proceso y Color</h4>
+                <p style="opacity: 1; line-height: 1.8; font-size: 1.05rem;"><?= nl2br(htmlspecialchars($producto['elaboracion'])) ?></p>
+            </div>
+            
+            <div style="margin-bottom: 30px; background: rgba(212,175,55,0.07); padding: 20px; border-left: 4px solid #d4af37; border-radius: 8px;">
+                <h4 style="color: #d4af37; text-transform: uppercase; font-size: 0.9rem; letter-spacing: 2px; margin-bottom: 10px; font-weight: 700;"><i class="fas fa-certificate" style="margin-right: 8px;"></i> Esencia de la Pieza</h4>
+                <p style="opacity: 1; line-height: 1.8; font-size: 1.05rem; margin: 0; font-style: italic;"><?= nl2br(htmlspecialchars($producto['observaciones'])) ?></p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <h4 style="color: #d4af37; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 2px; margin-bottom: 10px; font-weight: 700;"><i class="fas fa-hand-sparkles" style="margin-right: 8px;"></i> Mantenimiento</h4>
+                    <p style="opacity: 0.9; font-size: 0.95rem; line-height: 1.6;"><?= nl2br(htmlspecialchars($producto['mantenimiento'])) ?></p>
+                </div>
+                <div class="col-md-6 mb-4">
+                    <h4 style="color: #d4af37; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 2px; margin-bottom: 10px; font-weight: 700;"><i class="fas fa-leaf" style="margin-right: 8px;"></i> Sostenibilidad</h4>
+                    <p style="opacity: 0.9; font-size: 0.95rem; line-height: 1.6;"><?= nl2br(htmlspecialchars($producto['sostenibilidad'])) ?></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pie del Modal -->
+        <div style="padding: 25px; text-align: center; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.05);">
+            <button onclick="document.getElementById('modalTecnica').style.display='none'" 
+                    style="background: #d4af37; color: #000; border: none; padding: 12px 45px; font-weight: 800; border-radius: 50px; cursor: pointer; font-size: 1rem; text-transform: uppercase; transition: all 0.3s; box-shadow: 0 5px 15px rgba(212,175,55,0.3);">
+                Entendido
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- Modal Fullscreen -->
 <div id="imageModal" class="modal-fs">

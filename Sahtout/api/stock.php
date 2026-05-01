@@ -134,7 +134,7 @@ if ($metodo === 'GET') {
         $marca_folder = $mapping[$marca] ?? str_replace(' ', '_', $marca);
         $sku_folder = str_replace(['/', '\\'], '_', preg_replace('/P\d+$/', '', $base));
         
-        $desktop_base = "../uploads/articulos/repo_pc/";
+        $desktop_base = "../uploads/articulos/imagenes/";
         $brand_desktop_dir = $desktop_base . $marca_folder . "/";
         
         $suffixes = ["_1", "", "_" . strtoupper($color_req), "_" . $color_req, "_" . ucfirst(strtolower($color_req))];
@@ -392,7 +392,7 @@ if ($metodo === 'GET') {
         echo json_encode(['next_ref' => $next_ref]);
         exit();
     }
-    echo json_encode($stmt->fetchAll());
+    // Fin de GET
 }
 
 elseif ($metodo === 'PUT') {

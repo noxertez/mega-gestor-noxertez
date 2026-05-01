@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/linkedin_prompts.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     die(json_encode(['error' => 'Método no permitido']));
@@ -25,60 +26,66 @@ if ($sku_ref) {
     }
 }
 
-// 2. Construir Prompt Base
-$prompt = "Eres un experto en marketing de contenidos para LinkedIn. Escribe un post para LinkedIn sobre Noxertez, un taller artesanal español que crea mosaicos geométricos de madera, figuras decorativas y esculturas volumétricas hechas a mano. El post debe ser en español, tono $tono, máximo 1500 caracteres, con emojis apropiados, y terminar con 3-5 hashtags relevantes. No uses comillas al inicio ni al final.";
+// 2. Obtener datos del mockup si existe en el body (opcional para manual)
+$estancia = $body['estancia'] ?? '';
+$decoracion = $body['decoracion'] ?? '';
 
-// 3. Añadir Prompt específico por tipo
-switch ($tipo) {
-    case 'producto':
-        $prompt .= "\n\n" . ($producto_info ?: "Presenta uno de nuestros productos estrella, destacando la calidad de la madera y el trabajo artesanal.");
-        break;
-    case 'behind_scenes':
-        $prompt .= "\n\nDescribe el proceso artesanal de creación de mosaicos de madera: selección de materiales, corte de piezas, montaje geométrico, barnizado y control de calidad.";
-        break;
-    case 'marca':
-        $prompt .= "\n\nHabla sobre la historia y valores de Noxertez: artesanía española, personalización por encargo, piezas únicas hechas a mano con madera natural.";
-        break;
-    case 'promocion':
-        $prompt .= "\n\nCrea un post promocional destacando que las piezas se personalizan en color y tamaño bajo pedido, sin stock muerto, producción a demanda.";
-        break;
-    default:
-        $prompt .= "\n\nCrea un post inspirador sobre decoración artesanal y diseño geométrico.";
-}
+// 3. Construir Prompt con la nueva guía
+$prompt = getNoxertezLinkedinPrompt([
+    'estancia'   => $estancia,
+    'decoracion' => $decoracion,
+    'info_prod'  => $producto_info,
+    'contexto'   => $contexto,
+    'tono'       => $tono
+]);
 
-if (!empty($contexto)) {
-    $prompt .= "\n\nContexto adicional: $contexto";
-}
+// 4. Intentar llamar a la IA (Gemini o Groq)
+$texto = "";
+$error_msg = "";
 
-// 4. Llamar a Gemini API
-$url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . GEMINI_API_KEY;
+// Intentar Gemini primero
+$url_gemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" . GEMINI_API_KEY;
+$data_gemini = ["contents" => [["parts" => [["text" => $prompt]]]]];
 
-$data = [
-    "contents" => [
-        [
-            "parts" => [
-                ["text" => $prompt]
-            ]
-        ]
-    ]
-];
-
-$ch = curl_init($url);
+$ch = curl_init($url_gemini);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-
-$response = curl_exec($ch);
-if (curl_errno($ch)) {
-    die(json_encode(['error' => 'Error CURL: ' . curl_error($ch)]));
-}
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data_gemini));
+$res_gemini = json_decode(curl_exec($ch), true);
 curl_close($ch);
 
-$res = json_decode($response, true);
-if (isset($res['candidates'][0]['content']['parts'][0]['text'])) {
-    $texto = trim($res['candidates'][0]['content']['parts'][0]['text']);
+if (isset($res_gemini['candidates'][0]['content']['parts'][0]['text'])) {
+    $texto = trim($res_gemini['candidates'][0]['content']['parts'][0]['text']);
+} else {
+    // Si Gemini falla, probar Groq
+    $url_groq = "https://api.groq.com/openai/v1/chat/completions";
+    $data_groq = [
+        "model" => "llama-3.3-70b-versatile",
+        "messages" => [["role" => "user", "content" => $prompt]],
+        "temperature" => 0.7
+    ];
+    
+    $ch = curl_init($url_groq);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . GROQ_API_KEY
+    ]);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data_groq));
+    $res_groq = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+    
+    if (isset($res_groq['choices'][0]['message']['content'])) {
+        $texto = trim($res_groq['choices'][0]['message']['content']);
+    } else {
+        $error_msg = "Ambas IAs fallaron. Gemini: " . ($res_gemini['error']['message'] ?? 'Error desconocido') . ". Groq: " . ($res_groq['error']['message'] ?? 'Error desconocido');
+    }
+}
+
+if ($texto) {
     echo json_encode(['ok' => true, 'texto' => $texto]);
 } else {
-    echo json_encode(['error' => 'Error de Gemini: ' . ($res['error']['message'] ?? 'Respuesta inesperada'), 'debug' => $res]);
+    echo json_encode(['error' => $error_msg, 'debug' => ['gemini' => $res_gemini, 'groq' => $res_groq]]);
 }

@@ -1,0 +1,134 @@
+{
+  "name": "03 - Seguimiento Post-Venta (v2)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 4 }]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Revisar cada 4 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT numero_pedido, telefono, nombre_cliente, fecha_entrega FROM pedidos WHERE estado = 'entregado' AND seguimiento_enviado = 0 AND fecha_entrega IS NOT NULL AND DATE_ADD(fecha_entrega, INTERVAL 24 HOUR) <= NOW() LIMIT 10",
+        "options": {}
+      },
+      "id": "node-buscar",
+      "name": "Buscar pedidos para seguimiento",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.numero_pedido }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "node-hay",
+      "name": "¿Hay pedidos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst nombre = d.nombre_cliente || 'cliente';\nconst pedido = d.numero_pedido || '';\nconst texto = `Hola ${nombre}! 😊 Han pasado 24h desde que recibiste tu pedido ${pedido}. ¿Todo llegó perfectamente? ¿Estás contento con tu compra? Nos encantaría saberlo. ¡Gracias por confiar en Noxertez! 🪵`;\nreturn [{ json: {\n  numero_pedido: pedido,\n  telefono: d.telefono || '',\n  nombre_cliente: nombre,\n  texto_mensaje: texto,\n  timestamp: new Date().toISOString()\n}}];"
+      },
+      "id": "node-preparar",
+      "name": "Preparar mensaje seguimiento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO seguimientos_pendientes (numero_pedido, telefono, nombre_cliente, texto_mensaje, fecha_creacion, enviado) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.texto_mensaje }}', NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-guardar",
+      "name": "Guardar en cola seguimientos",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1100, 180],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } },
+      "notes": "Tu app muestra esta cola con botón Copiar para enviarlo tú por WhatsApp"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pedidos SET seguimiento_enviado = 1 WHERE numero_pedido = '{{ $json.numero_pedido }}'",
+        "options": {}
+      },
+      "id": "node-marcar",
+      "name": "Marcar seguimiento procesado",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1320, 180],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('seguimiento_postventa', CONCAT('📬 Seguimiento pendiente de enviar a ', '{{ $json.nombre_cliente }}', ' - Pedido ', '{{ $json.numero_pedido }}'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif",
+      "name": "Notificación en Mega Gestor",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1540, 180],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { info: 'Sin pedidos para seguimiento en este ciclo' } }];"
+      },
+      "id": "node-nada",
+      "name": "Sin pedidos pendientes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 420]
+    }
+  ],
+  "connections": {
+    "Revisar cada 4 horas": {
+      "main": [[{ "node": "Buscar pedidos para seguimiento", "type": "main", "index": 0 }]]
+    },
+    "Buscar pedidos para seguimiento": {
+      "main": [[{ "node": "¿Hay pedidos?", "type": "main", "index": 0 }]]
+    },
+    "¿Hay pedidos?": {
+      "main": [
+        [{ "node": "Preparar mensaje seguimiento", "type": "main", "index": 0 }],
+        [{ "node": "Sin pedidos pendientes", "type": "main", "index": 0 }]
+      ]
+    },
+    "Preparar mensaje seguimiento": {
+      "main": [[{ "node": "Guardar en cola seguimientos", "type": "main", "index": 0 }]]
+    },
+    "Guardar en cola seguimientos": {
+      "main": [[{ "node": "Marcar seguimiento procesado", "type": "main", "index": 0 }]]
+    },
+    "Marcar seguimiento procesado": {
+      "main": [[{ "node": "Notificación en Mega Gestor", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["postventa", "seguimiento", "noxertez"]
+}

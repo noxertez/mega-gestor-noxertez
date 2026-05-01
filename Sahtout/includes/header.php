@@ -190,6 +190,190 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }
     }
+
+    /* ===== CAMPANA DE NOTIFICACIONES ===== */
+    .nox-bell-btn {
+        position: relative;
+        background: rgba(212,175,55,0.15);
+        border: 1px solid rgba(212,175,55,0.4);
+        color: #d4af37;
+        border-radius: 8px;
+        width: 40px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: all 0.2s ease;
+        margin-left: 8px;
+        flex-shrink: 0;
+    }
+    .nox-bell-btn:hover {
+        background: rgba(212,175,55,0.35);
+        transform: scale(1.08);
+    }
+    .nox-bell-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 0.6rem;
+        font-weight: 800;
+        border-radius: 50%;
+        min-width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 3px;
+        box-shadow: 0 0 6px rgba(239,68,68,0.7);
+        animation: bellPulse 2s infinite;
+    }
+    .nox-bell-badge.hidden { display: none; }
+    @keyframes bellPulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+    }
+    /* Panel lateral */
+    #nox-notif-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        z-index: 10000;
+    }
+    #nox-notif-overlay.open { display: block; }
+    #nox-notif-panel {
+        position: fixed;
+        top: 0;
+        right: -420px;
+        width: 400px;
+        height: 100vh;
+        background: rgba(10,10,15,0.97);
+        backdrop-filter: blur(20px);
+        border-left: 2px solid rgba(212,175,55,0.4);
+        z-index: 10001;
+        display: flex;
+        flex-direction: column;
+        transition: right 0.35s cubic-bezier(0.4,0,0.2,1);
+        font-family: 'Inter', sans-serif;
+    }
+    #nox-notif-panel.open { right: 0; }
+    .nox-notif-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px;
+        border-bottom: 1px solid rgba(212,175,55,0.25);
+        flex-shrink: 0;
+    }
+    .nox-notif-header h3 {
+        color: #d4af37;
+        font-size: 1rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 0;
+    }
+    .nox-notif-header-actions { display: flex; align-items: center; gap: 8px; }
+    .nox-btn-mark-all {
+        background: rgba(212,175,55,0.2);
+        border: 1px solid rgba(212,175,55,0.5);
+        color: #d4af37;
+        font-size: 0.7rem;
+        padding: 4px 10px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: 700;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+    .nox-btn-mark-all:hover { background: rgba(212,175,55,0.4); }
+    .nox-notif-close {
+        background: none;
+        border: none;
+        color: #888;
+        font-size: 1.3rem;
+        cursor: pointer;
+        line-height: 1;
+        transition: color 0.2s;
+    }
+    .nox-notif-close:hover { color: #fff; }
+    #nox-notif-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 0;
+    }
+    #nox-notif-list::-webkit-scrollbar { width: 4px; }
+    #nox-notif-list::-webkit-scrollbar-track { background: transparent; }
+    #nox-notif-list::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.3); border-radius: 2px; }
+    .nox-notif-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        transition: background 0.2s;
+        animation: fadeInDown 0.3s ease;
+    }
+    .nox-notif-item:hover { background: rgba(255,255,255,0.03); }
+    .nox-notif-item.unread { border-left: 3px solid #d4af37; padding-left: 17px; }
+    .nox-notif-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+    .nox-notif-body { flex: 1; min-width: 0; }
+    .nox-notif-tipo {
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 3px;
+    }
+    .nox-notif-msg {
+        color: #ccc;
+        font-size: 0.82rem;
+        line-height: 1.4;
+        word-break: break-word;
+    }
+    .nox-notif-fecha {
+        color: #555;
+        font-size: 0.68rem;
+        margin-top: 4px;
+    }
+    .nox-btn-read {
+        background: none;
+        border: 1px solid rgba(255,255,255,0.12);
+        color: #666;
+        border-radius: 4px;
+        padding: 3px 7px;
+        font-size: 0.65rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        flex-shrink: 0;
+        margin-top: 4px;
+    }
+    .nox-btn-read:hover { border-color: #22c55e; color: #22c55e; }
+    .nox-notif-empty {
+        text-align: center;
+        color: #555;
+        padding: 40px 20px;
+        font-size: 0.85rem;
+    }
+    .nox-notif-empty i { font-size: 2rem; display: block; margin-bottom: 10px; color: #333; }
+    @media (max-width: 480px) {
+        #nox-notif-panel { width: 100vw; right: -100vw; }
+    }
 </style>
 
 <body class="<?php echo $page_class; ?>">
@@ -282,6 +466,11 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
                     <a href="<?php echo $base_path; ?>pages/mockups.php" class="admin-nav-btn" style="background:rgba(212,175,55,0.2); border:1px solid var(--accent-gold);">
                         <i class="fas fa-palette"></i> Mockups
                     </a>
+                    <!-- 🔔 Campana de Notificaciones -->
+                    <button id="nox-bell-trigger" class="nox-bell-btn" title="Notificaciones" onclick="noxNotifOpen()">
+                        <i class="fas fa-bell"></i>
+                        <span id="nox-bell-badge" class="nox-bell-badge hidden">0</span>
+                    </button>
                     <!-- Pinterest Publisher → menú ADMINISTRACIÓN -->
                 <?php endif; ?>
             <?php endif; ?>
@@ -295,4 +484,160 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
     document.body.dataset.base = '<?php echo htmlspecialchars($base_path); ?>';
 </script>
 <script src="<?php echo $base_path; ?>assets/js/chatbot_privado.js"></script>
+
+<!-- ===== PANEL DE NOTIFICACIONES ===== -->
+<div id="nox-notif-overlay" onclick="noxNotifClose()"></div>
+<div id="nox-notif-panel">
+    <div class="nox-notif-header">
+        <h3><i class="fas fa-bell" style="margin-right:8px;"></i>Notificaciones</h3>
+        <div class="nox-notif-header-actions">
+            <button class="nox-btn-mark-all" onclick="noxMarcarTodas()">✔ Marcar todas leídas</button>
+            <button class="nox-notif-close" onclick="noxNotifClose()" title="Cerrar">✕</button>
+        </div>
+    </div>
+    <div id="nox-notif-list">
+        <div class="nox-notif-empty"><i class="fas fa-bell-slash"></i>Cargando...</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var BASE = '<?php echo htmlspecialchars($base_path); ?>';
+    var API  = BASE + 'api/notificaciones.php';
+
+    // Mapa de tipos → icono + color
+    var TIPO_MAP = {
+        'stock':     { icon: 'fa-warehouse',      color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+        'pedido':    { icon: 'fa-box',             color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
+        'error':     { icon: 'fa-exclamation-circle', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+        'linkedin':  { icon: 'fab fa-linkedin',    color: '#0a66c2', bg: 'rgba(10,102,194,0.15)' },
+        'sistema':   { icon: 'fa-cog',             color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
+        'seguimiento':{ icon: 'fa-truck',          color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+        'default':   { icon: 'fa-bell',            color: '#d4af37', bg: 'rgba(212,175,55,0.15)' }
+    };
+
+    function getTipo(tipo) {
+        var key = (tipo || '').toLowerCase();
+        return TIPO_MAP[key] || TIPO_MAP['default'];
+    }
+
+    // Actualizar badge
+    function noxActualizarBadge() {
+        fetch(API + '?action=count', { cache: 'no-store' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                var badge = document.getElementById('nox-bell-badge');
+                if (!badge) return;
+                if (d.total > 0) {
+                    badge.textContent = d.total > 99 ? '99+' : d.total;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            })
+            .catch(function(){});
+    }
+
+    // Renderizar lista
+    function noxRenderList(items) {
+        var list = document.getElementById('nox-notif-list');
+        if (!list) return;
+        if (!items || items.length === 0) {
+            list.innerHTML = '<div class="nox-notif-empty"><i class="fas fa-check-circle" style="color:#22c55e;"></i>¡Todo al día! No hay notificaciones.</div>';
+            return;
+        }
+        var html = '';
+        items.forEach(function(n) {
+            var t = getTipo(n.tipo);
+            var unread = n.leida == 0 ? ' unread' : '';
+            var btnHtml = n.leida == 0
+                ? '<button class="nox-btn-read" onclick="noxMarcarLeida(' + n.id + ',this)">Marcar leída</button>'
+                : '<span style="color:#22c55e;font-size:0.65rem;">✔ Leída</span>';
+            html += '<div class="nox-notif-item' + unread + '" id="notif-' + n.id + '">' +
+                '<div class="nox-notif-icon" style="background:' + t.bg + '; color:' + t.color + '">' +
+                    '<i class="fas ' + t.icon + '"></i>' +
+                '</div>' +
+                '<div class="nox-notif-body">' +
+                    '<div class="nox-notif-tipo" style="color:' + t.color + '">' + escHTML(n.tipo) + '</div>' +
+                    '<div class="nox-notif-msg">' + escHTML(n.mensaje) + '</div>' +
+                    '<div class="nox-notif-fecha"><i class="fas fa-clock" style="margin-right:4px;"></i>' + escHTML(n.fecha_fmt) + '</div>' +
+                '</div>' +
+                '<div style="display:flex;flex-direction:column;align-items:flex-end;">' + btnHtml + '</div>' +
+            '</div>';
+        });
+        list.innerHTML = html;
+    }
+
+    function escHTML(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Cargar notificaciones
+    function noxCargarNotificaciones() {
+        var list = document.getElementById('nox-notif-list');
+        if (list) list.innerHTML = '<div class="nox-notif-empty"><i class="fas fa-spinner fa-spin"></i>Cargando...</div>';
+        fetch(API + '?action=list', { cache: 'no-store' })
+            .then(function(r){ return r.json(); })
+            .then(function(d){ noxRenderList(d.notificaciones || []); })
+            .catch(function(){
+                var list2 = document.getElementById('nox-notif-list');
+                if (list2) list2.innerHTML = '<div class="nox-notif-empty"><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i>Error al cargar.</div>';
+            });
+    }
+
+    // Marcar una como leída
+    window.noxMarcarLeida = function(id, btn) {
+        var fd = new FormData();
+        fd.append('action', 'marcar_leida');
+        fd.append('id', id);
+        fetch(API, { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (d.ok) {
+                    var item = document.getElementById('notif-' + id);
+                    if (item) {
+                        item.classList.remove('unread');
+                        item.style.borderLeft = 'none';
+                        var btnWrap = item.querySelector('.nox-btn-read');
+                        if (btnWrap) btnWrap.outerHTML = '<span style="color:#22c55e;font-size:0.65rem;">✔ Leída</span>';
+                    }
+                    noxActualizarBadge();
+                }
+            })
+            .catch(function(){});
+    };
+
+    // Marcar todas
+    window.noxMarcarTodas = function() {
+        var fd = new FormData();
+        fd.append('action', 'marcar_todas');
+        fetch(API, { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (d.ok) {
+                    noxCargarNotificaciones();
+                    noxActualizarBadge();
+                }
+            })
+            .catch(function(){});
+    };
+
+    // Abrir panel
+    window.noxNotifOpen = function() {
+        document.getElementById('nox-notif-overlay').classList.add('open');
+        document.getElementById('nox-notif-panel').classList.add('open');
+        noxCargarNotificaciones();
+    };
+
+    // Cerrar panel
+    window.noxNotifClose = function() {
+        document.getElementById('nox-notif-overlay').classList.remove('open');
+        document.getElementById('nox-notif-panel').classList.remove('open');
+    };
+
+    // Init: actualizar badge cada 60s
+    noxActualizarBadge();
+    setInterval(noxActualizarBadge, 60000);
+})();
+</script>
 <?php endif; ?>

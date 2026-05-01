@@ -17,9 +17,9 @@ define('API_KEY', 'noxertez_api_2024');  // Cambia esto
 // Obtén tu clave en: https://console.anthropic.com/
 // ============================================================
 define('CLAUDE_API_KEY', 'TU_CLAUDE_API_KEY_AQUI');
-define('GEMINI_API_KEY', 'AIzaSyDkG3eKE3jK3brV2P1-DDOJZZ3Phco7OuU');
-define('GROQ_API_KEY', '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');
-define('PACKLINK_API_KEY', 'dac62040c3d23c50c9e76fef5f8dfe2de2fbaa38d72d2cdd33fa609839f7f3da');
+define('GEMINI_API_KEY', 'TU_GEMINI_API_KEY_AQUI');
+define('GROQ_API_KEY', 'TU_GROQ_API_KEY_AQUI');
+define('PACKLINK_API_KEY', 'TU_PACKLINK_API_KEY_AQUI');
 
 // Funcion de conexion (reutilizable en todos los endpoints)
 function conectar() {

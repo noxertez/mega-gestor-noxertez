@@ -1,0 +1,92 @@
+{
+  "name": "08 - Correo Info y Ayuda a Mega Gestor",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "mailbox": "INBOX",
+        "options": {
+          "allowUnauthorizedCerts": false
+        },
+        "postProcessAction": "read"
+      },
+      "id": "node-imap",
+      "name": "Nuevo Correo IMAP",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "credentials": { "imap": { "id": "", "name": "IMAP account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\n\n// Solo procesar info@ y ayuda@\nconst esParaInfo = para.includes('info@noxertez.com');\nconst esParaAyuda = para.includes('ayuda@noxertez.com');\n\n// Anti-bucle y anti-spam\nconst esPropio = de.includes('noxertez@gmail.com') || de.includes('@noxertez.com') || de.includes('mailer-daemon') || de.includes('noreply') || de.includes('no-reply');\nconst esSpam = ['newsletter','marketing','notification','publicidad','unsubscribe','wallapop','vinted'].some(s => asunto.includes(s) || de.includes(s));\n\nif ((!esParaInfo && !esParaAyuda) || esPropio || esSpam) {\n  return [{ json: { ignorar: true } }];\n}\n\n// Extraer remitente\nconst deRaw = email.from || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nconst emailMatch = deRaw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\nconst emailLimpio = emailMatch ? emailMatch[0] : deRaw;\n\nconst tipo = esParaAyuda ? 'ayuda' : 'info';\nconst emoji = esParaAyuda ? '🆘' : 'ℹ️';\nconst cuerpo = (email.text || '').substring(0, 400);\n\nreturn [{ json: {\n  ignorar: false,\n  tipo,\n  emoji,\n  nombre,\n  email: emailLimpio,\n  asunto: email.subject || '(sin asunto)',\n  cuerpo,\n  fecha: new Date().toISOString()\n}}];"
+      },
+      "id": "node-filtrar",
+      "name": "Filtrar y clasificar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.ignorar }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true" }
+            }
+          ]
+        }
+      },
+      "id": "node-check",
+      "name": "¿Ignorar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { info: 'Ignorado' } }];"
+      },
+      "id": "node-ignorar",
+      "name": "Ignorar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('correo_{{ $json.tipo }}', CONCAT('{{ $json.emoji }}', ' Correo ', UPPER('{{ $json.tipo }}'), ': ', '{{ $json.nombre }}', ' (', '{{ $json.email }}', ') | Asunto: ', '{{ $json.asunto }}', ' | ', '{{ $json.cuerpo }}'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif",
+      "name": "Crear notificación en Mega Gestor",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [860, 420],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } },
+      "notes": "Aparece en el panel de notificaciones del Mega Gestor para que respondas manualmente"
+    }
+  ],
+  "connections": {
+    "Nuevo Correo IMAP": {
+      "main": [[{ "node": "Filtrar y clasificar", "type": "main", "index": 0 }]]
+    },
+    "Filtrar y clasificar": {
+      "main": [[{ "node": "¿Ignorar?", "type": "main", "index": 0 }]]
+    },
+    "¿Ignorar?": {
+      "main": [
+        [{ "node": "Ignorar", "type": "main", "index": 0 }],
+        [{ "node": "Crear notificación en Mega Gestor", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["info", "ayuda", "email", "noxertez"]
+}

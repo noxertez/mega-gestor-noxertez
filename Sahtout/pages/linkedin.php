@@ -66,6 +66,10 @@ if (!empty($cfg['linkedin_access_token']) && !empty($cfg['linkedin_token_expires
 $productos = $db->query("SELECT SKU_REF, NOMBRE, FOTO_PORTADA, PRECIO, CATEGORIA, DESCRIPCION, COLOR FROM productos WHERE ESTADO != 'inactivo' ORDER BY NOMBRE ASC LIMIT 1000")->fetchAll();
 $categorias = $db->query("SELECT DISTINCT CATEGORIA FROM productos WHERE CATEGORIA IS NOT NULL AND CATEGORIA != '' ORDER BY CATEGORIA ASC")->fetchAll(PDO::FETCH_COLUMN);
 
+// Cargar estancias y decoraciones de mockups
+$estancias = $db->query("SELECT DISTINCT estancia FROM mockups_varios WHERE estancia != '' ORDER BY estancia ASC")->fetchAll(PDO::FETCH_COLUMN);
+$decoraciones = $db->query("SELECT DISTINCT decoracion FROM mockups_varios WHERE decoracion != '' ORDER BY decoracion ASC")->fetchAll(PDO::FETCH_COLUMN);
+
 $page_class = 'linkedin-module';
 include('../includes/header.php');
 
@@ -95,6 +99,14 @@ function resolverRutaPublica($foto) {
     --text-gray: #aaa;
     --text-white: #fff;
     --bg-dark: #001a33;
+    --log-bg: rgba(0, 0, 0, 0.5);
+}
+
+/* COMPACTAR PARA MONITORES PEQUEÑOS */
+@media (max-height: 800px) {
+    .panel-management { padding: 15px; }
+    .panel-header-wow { margin-bottom: 1rem; }
+    .nav-tabs-wow { margin-bottom: 1.5rem; }
 }
 
 body { background-color: var(--bg-dark) !important; color: var(--text-white); font-family: 'Segoe UI', Roboto, sans-serif; }
@@ -162,13 +174,37 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
 
 /* Modal */
 .modal-overlay-wow { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.modal-content-wow { background: #111; border: 1px solid var(--accent-gold); border-radius: 20px; width: 90%; max-width: 600px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.modal-content-wow { background: #111; border: 1px solid var(--accent-gold); border-radius: 20px; width: 90%; max-width: 600px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); max-height: 90vh; display: flex; flex-direction: column; }
+.modal-body-wow { padding: 1.5rem; overflow-y: auto; flex: 1; }
 .modal-header-wow { padding: 20px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; }
 .modal-header-wow h2 { margin: 0; color: var(--accent-gold); }
 
 .stat-card { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-glass); border-radius: 12px; padding: 1.2rem 1.5rem; flex: 1; min-width: 160px; text-align: center; }
 .stat-card .stat-num { font-size: 2rem; font-weight: 800; color: var(--accent-gold); }
 .stat-card .stat-lbl { font-size: .8rem; color: var(--text-gray); margin-top: 4px; }
+
+/* Estilos para el preview de mockups automáticos */
+.auto-mockup-item { position: relative; width: 100%; height: 60px; }
+.auto-mockup-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; }
+.auto-mockup-remove { position: absolute; top: -5px; right: -5px; background: #ef4444; color: #fff; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); transition: all 0.2s; z-index: 5; }
+.auto-mockup-remove:hover { transform: scale(1.2); background: #f87171; }
+
+/* Log de Actividad Persistente */
+.nox-activity-log {
+    background: var(--log-bg);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    padding: 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 0.75rem;
+    height: 120px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    color: #00ff00; /* Verde matrix para visibilidad a distancia */
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+}
+.log-entry { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
+.log-time { color: var(--accent-gold); margin-right: 8px; }
 
 @media (max-width: 768px) { .config-grid { grid-template-columns: 1fr; } }
 </style>
@@ -187,6 +223,11 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
     </div>
 
     <div id="resultado" style="display:none;"></div>
+
+    <!-- LOG DE ACTIVIDAD VISIBLE A DISTANCIA -->
+    <div class="nox-activity-log" id="main-activity-log">
+        <div class="log-entry"><span class="log-time">[<?php echo date('H:i:s'); ?>]</span> Sistema listo. Esperando acciones...</div>
+    </div>
 
     <div class="nav-tabs-wow">
         <div class="tab-link-wow active" onclick="switchTab('tab-redactor', this)">✍️ Redactor</div>
@@ -273,6 +314,7 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
         <div class="mode-toggle">
             <button class="mode-btn active" onclick="setModoRedactor('manual', this)">✍️ Manual</button>
             <button class="mode-btn" onclick="setModoRedactor('ia', this)">🤖 Con IA</button>
+            <button class="mode-btn" onclick="setModoRedactor('automatico', this)">⚡ Automático</button>
         </div>
 
         <div class="config-grid">
@@ -321,32 +363,97 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div id="ia-options" style="display:none;">
-                        <div class="nox-form-group">
-                            <label>Instrucciones adicionales para Gemini</label>
-                            <textarea id="li_ia_contexto" class="input-wow" style="width:100%" rows="3" placeholder="Ej: Menciona que es para el día del padre..."></textarea>
-                        </div>
-                        <div class="nox-form-group">
-                            <label>Tono</label>
-                            <select id="li_ia_tono" class="input-wow" style="width:100%">
-                                <option value="Profesional">Profesional</option>
-                                <option value="Cercano">Cercano</option>
-                                <option value="Inspirador">Inspirador</option>
-                                <option value="Informativo">Informativo</option>
+                <div id="ia-options" style="display:none;">
+                    <div class="nox-form-group">
+                        <label>Instrucciones adicionales para Gemini</label>
+                        <textarea id="li_ia_contexto" class="input-wow" style="width:100%" rows="3" placeholder="Ej: Menciona que es para el día del padre..."></textarea>
+                    </div>
+                    <div class="nox-form-group">
+                        <label>Tono</label>
+                        <select id="li_ia_tono" class="input-wow" style="width:100%">
+                            <option value="Profesional">Profesional</option>
+                            <option value="Cercano">Cercano</option>
+                            <option value="Inspirador">Inspirador</option>
+                            <option value="Informativo">Informativo</option>
+                        </select>
+                    </div>
+                    <button onclick="generarConIA()" class="btn-premium-wow btn-gold" style="width:100%; justify-content:center;">
+                        <i class="fas fa-robot"></i> 🤖 Generar con Gemini
+                    </button>
+                    <div id="spinner-ia"><i class="fas fa-circle-notch fa-spin"></i> Pensando con Gemini...</div>
+                </div>
+
+                <div id="ia-auto-options" style="display:none;">
+                    <div class="nox-form-group">
+                        <label>Filtros para Mockups</label>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+                            <select id="li_auto_cat" class="input-wow" onchange="previewAutoMockups()">
+                                <option value="">Categoría...</option>
+                                <?php foreach ($categorias as $cat): ?>
+                                    <option value="<?php echo htmlspecialchars($cat); ?>"><?php echo htmlspecialchars($cat); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select id="li_auto_estancia" class="input-wow" onchange="previewAutoMockups()">
+                                <option value="">Estancia...</option>
+                                <?php foreach ($estancias as $e): ?>
+                                    <option value="<?php echo htmlspecialchars($e); ?>"><?php echo htmlspecialchars($e); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
-                        <button onclick="generarConIA()" class="btn-premium-wow btn-gold" style="width:100%; justify-content:center;">
-                            <i class="fas fa-robot"></i> 🤖 Generar con Gemini
-                        </button>
-                        <div id="spinner-ia"><i class="fas fa-circle-notch fa-spin"></i> Pensando con Gemini...</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                            <select id="li_auto_deco" class="input-wow" onchange="previewAutoMockups()">
+                                <option value="">Decoración...</option>
+                                <?php foreach ($decoraciones as $d): ?>
+                                    <option value="<?php echo htmlspecialchars($d); ?>"><?php echo htmlspecialchars($d); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="number" id="li_auto_cantidad" class="input-wow" placeholder="Cantidad (ej: 10)" value="10" oninput="previewAutoMockups()">
+                        </div>
                     </div>
 
-                    <div class="nox-form-group" style="margin-top:1.5rem;">
-                        <label>Texto del post</label>
-                        <textarea id="li_texto" class="input-wow" style="width:100%" rows="8" maxlength="3000" oninput="actualizarContador()"></textarea>
-                        <div class="char-counter"><span id="char-count">0</span>/3000</div>
+                    <!-- Grid de Preview de Mockups -->
+                    <div id="auto-mockups-preview" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(80px, 1fr)); gap:10px; max-height:200px; overflow-y:auto; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px; margin-bottom:1.5rem; border:1px solid var(--border-glass);">
+                        <div style="grid-column:1/-1; text-align:center; color:var(--text-gray); font-size:0.8rem;">Selecciona filtros para ver mockups</div>
                     </div>
+
+                    <div class="nox-form-group">
+                        <label>Instrucciones para Gemini</label>
+                        <textarea id="li_auto_contexto" class="input-wow" style="width:100%" rows="3" placeholder="Contexto para todos los posts..."></textarea>
+                    </div>
+                    <div class="nox-form-group">
+                        <label>Tono</label>
+                        <select id="li_auto_tono" class="input-wow" style="width:100%">
+                            <option value="Profesional">Profesional</option>
+                            <option value="Cercano">Cercano</option>
+                            <option value="Inspirador">Inspirador</option>
+                            <option value="Informativo">Informativo</option>
+                        </select>
+                    </div>
+
+                    <div style="background:rgba(212,175,55,0.05); padding:15px; border-radius:12px; border:1px solid var(--border-glass); margin-bottom:1.5rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                            <span style="font-size:0.85rem; font-weight:bold;">Llamadas API: <span id="api-call-count" style="color:var(--accent-gold);">0</span></span>
+                            <span id="auto-progress-text" style="font-size:0.85rem; color:var(--text-gray);">Esperando...</span>
+                        </div>
+                        <div style="width:100%; height:8px; background:rgba(255,255,255,0.05); border-radius:10px; overflow:hidden;">
+                            <div id="auto-progress-bar" style="width:0%; height:100%; background:var(--accent-gold); transition:width 0.3s;"></div>
+                        </div>
+                    </div>
+
+                    <button id="btn-auto-programar" onclick="programarAutomatico()" class="btn-premium-wow btn-gold" style="width:100%; justify-content:center;">
+                        <i class="fas fa-magic"></i> ✨ Programar Automáticamente (3/día)
+                    </button>
+                    <div id="spinner-auto" style="display:none; align-items:center; gap:10px; color:var(--accent-gold); margin-top:15px; font-weight:bold; background:rgba(212,175,55,0.1); padding:12px; border-radius:10px; justify-content:center;">
+                        <i class="fas fa-circle-notch fa-spin"></i> Procesando posts...
+                    </div>
+                </div>
+
+                <div id="li-texto-group" class="nox-form-group" style="margin-top:1.5rem;">
+                    <label>Texto del post</label>
+                    <textarea id="li_texto" class="input-wow" style="width:100%" rows="8" maxlength="3000" oninput="actualizarContador()"></textarea>
+                    <div class="char-counter"><span id="char-count">0</span>/3000</div>
                 </div>
             </div>
 
@@ -354,7 +461,7 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
             <div class="config-card">
                 <div class="nox-form-group">
                     <label>URL de Imagen (Opcional)</label>
-                    <input type="text" id="li_imagen_url" class="input-wow" style="width:100%" placeholder="https://..." oninput="previewImagen(this.value)">
+                    <input type="text" id="li_imagen_url" class="input-wow" style="width:100%" placeholder="uploads/..." oninput="previewImagen(resolverRutaJS(this.value))">
                     <div class="img-preview-container">
                         <img id="img-preview" class="img-preview">
                         <div id="img-preview-empty" style="color:var(--text-gray); font-size:0.8rem;">Vista previa de la imagen</div>
@@ -445,7 +552,7 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
             <h2>Editar Post</h2>
             <button onclick="document.getElementById('modal-edit').style.display='none'">&times;</button>
         </div>
-        <div style="padding:1.5rem;">
+        <div class="modal-body-wow">
             <input type="hidden" id="edit-id">
             <div class="nox-form-group">
                 <label>Texto</label>
@@ -456,247 +563,20 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
                 <input type="datetime-local" id="edit-fecha" class="input-wow" style="width:100%">
             </div>
             <div class="nox-form-group">
-                <label>URL Imagen</label>
-                <input type="text" id="edit-imagen" class="input-wow" style="width:100%">
+                <label>URL Imagen / Ruta</label>
+                <input type="text" id="edit-imagen" class="input-wow" style="width:100%" oninput="document.getElementById('edit-preview').src = resolverRutaJS(this.value)">
+                <div class="img-preview-container" style="min-height:100px; margin-top:10px;">
+                    <img id="edit-preview" class="img-preview" style="display:block; max-height:150px;">
+                </div>
             </div>
             <div style="display:flex; gap:10px; margin-top:1rem;">
-                <button onclick="guardarEdicion()" class="btn-premium-wow btn-gold" style="flex:1;">💾 Guardar Cambios</button>
+                <button onclick="guardarEdicion()" class="btn-premium-wow btn-gold" style="flex:1.5;">💾 Guardar Cambios</button>
+                <button onclick="regenerarIA(document.getElementById('edit-id').value)" class="btn-premium-wow" style="background:var(--linkedin-blue); flex:1;"><i class="fas fa-magic"></i> IA</button>
                 <button onclick="document.getElementById('modal-edit').style.display='none'" class="btn-premium-wow" style="background:#4b5563; flex:1;">Cancelar</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-const BASE_PATH = '../';
-let modoActual = 'manual';
-let paginaActual = 1;
+<script src="../js/linkedin.js?v=<?php echo time(); ?>"></script>
 
-function resolverRutaJS(foto) {
-    if (!foto || foto === 'img/logo.png') return BASE_PATH + 'img/logo.png';
-    const clean = foto.replace(/\\/g, '/');
-    
-    if (/^[a-zA-Z]:\//.test(clean)) {
-        const idx = clean.toLowerCase().indexOf('uploads/');
-        if (idx !== -1) return BASE_PATH + clean.substring(idx);
-        const idxImg = clean.toLowerCase().indexOf('/imagenes/');
-        if (idxImg !== -1) return BASE_PATH + 'uploads/articulos' + clean.substring(idxImg);
-        return BASE_PATH + 'uploads/articulos/imagenes/' + clean.split('/').pop();
-    }
-    
-    if (clean.startsWith('uploads/')) return BASE_PATH + clean;
-    return BASE_PATH + 'uploads/' + clean;
-}
-
-function switchTab(id, el) {
-    document.querySelectorAll('.tab-container').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-link-wow').forEach(l => l.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    el.classList.add('active');
-    
-    if (id === 'tab-cola') cargarCola();
-    if (id === 'tab-stats') cargarStats();
-}
-
-function setModoRedactor(modo, el) {
-    modoActual = modo;
-    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('ia-options').style.display = (modo === 'ia') ? 'block' : 'none';
-}
-
-function checkTipoProducto() {
-    const tipo = document.getElementById('li_tipo').value;
-    document.getElementById('group-producto').style.display = (tipo === 'producto') ? 'block' : 'none';
-}
-
-function filtrarProductosSelector() {
-    const cat = document.getElementById('li_filtro_cat').value.toLowerCase();
-    const txt = document.getElementById('li_filtro_txt').value.toLowerCase();
-    const select = document.getElementById('li_sku');
-    const options = select.options;
-
-    for (let i = 1; i < options.length; i++) {
-        const option = options[i];
-        const optCat = (option.dataset.categoria || '').toLowerCase();
-        const optTxt = option.text.toLowerCase();
-        
-        const matchCat = !cat || optCat === cat;
-        const matchTxt = !txt || optTxt.includes(txt);
-        
-        option.style.display = (matchCat && matchTxt) ? 'block' : 'none';
-    }
-}
-
-function cargarDatosProducto(sku) {
-    if (!sku) {
-        document.getElementById('sku-preview-img').style.display = 'none';
-        document.getElementById('sku-preview-placeholder').style.display = 'block';
-        return;
-    }
-    const opt = document.querySelector(`#li_sku option[value="${sku}"]`);
-    const nombre = opt.dataset.nombre;
-    const foto_raw = opt.dataset.foto;
-    
-    if (modoActual === 'manual') {
-        document.getElementById('li_texto').value = `Presentamos nuestro ${nombre}. Hecho a mano con madera natural. #Noxertez #Artesania`;
-        actualizarContador();
-    }
-    
-    if (foto_raw) {
-        const foto_final = resolverRutaJS(foto_raw);
-        document.getElementById('li_imagen_url').value = foto_final;
-        previewImagen(foto_final);
-        
-        const quickImg = document.getElementById('sku-preview-img');
-        const quickPh = document.getElementById('sku-preview-placeholder');
-        quickImg.src = foto_final;
-        quickImg.style.display = 'block';
-        quickPh.style.display = 'none';
-    } else {
-        document.getElementById('sku-preview-img').style.display = 'none';
-        document.getElementById('sku-preview-placeholder').style.display = 'block';
-    }
-}
-
-function previewImagen(url) {
-    const img = document.getElementById('img-preview');
-    const empty = document.getElementById('img-preview-empty');
-    if (url) {
-        img.src = url;
-        img.style.display = 'block';
-        if(empty) empty.style.display = 'none';
-    } else {
-        img.style.display = 'none';
-        if(empty) empty.style.display = 'block';
-    }
-}
-
-function actualizarContador() {
-    const n = document.getElementById('li_texto').value.length;
-    const el = document.getElementById('char-count');
-    el.textContent = n;
-    el.style.color = (n > 2800) ? '#ef4444' : 'var(--text-gray)';
-}
-
-function mostrarResultado(msg, tipo) {
-    const el = document.getElementById('resultado');
-    const colores = {
-        ok:    { bg:'rgba(16,185,129,0.15)', border:'#10b981', color:'#10b981' },
-        error: { bg:'rgba(239,68,68,0.15)',  border:'#ef4444', color:'#ef4444' },
-        info:  { bg:'rgba(212,175,55,0.15)', border:'var(--accent-gold)', color:'var(--accent-gold)' }
-    };
-    const c = colores[tipo] || colores.info;
-    el.style.cssText = `display:block; background:${c.bg}; border:1px solid ${c.border}; color:${c.color}; padding:12px 16px; border-radius:8px; margin-bottom:1rem; font-weight:bold;`;
-    el.innerHTML = msg;
-    setTimeout(() => { el.style.display = 'none'; }, 5000);
-}
-
-async function guardarCredenciales() {
-    const data = { client_id: document.getElementById('li_client_id').value, client_secret: document.getElementById('li_client_secret').value, pps: document.getElementById('li_pps').value };
-    try {
-        const r = await fetch('../api/linkedin_oauth.php?accion=save_config', { method: 'POST', body: JSON.stringify(data) });
-        const d = await r.json();
-        if (d.ok) { mostrarResultado('✅ Credenciales guardadas', 'ok'); setTimeout(() => location.reload(), 1000); } 
-        else mostrarResultado('❌ ' + d.error, 'error');
-    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
-}
-
-function autorizarLinkedIn() { window.location.href = '../api/linkedin_oauth.php?step=1'; }
-
-async function renovarToken() {
-    try {
-        const r = await fetch('../api/linkedin_oauth.php?accion=refresh');
-        const d = await r.json();
-        if (d.ok) { mostrarResultado('✅ Token renovado', 'ok'); setTimeout(() => location.reload(), 1000); } 
-        else mostrarResultado('❌ ' + d.error, 'error');
-    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
-}
-
-async function verificarCuenta() {
-    try {
-        const r = await fetch('../api/linkedin_oauth.php?accion=verify');
-        const d = await r.json();
-        if (d.ok) {
-            document.getElementById('perfil-info').innerHTML = `<div style="display:flex; align-items:center; gap:10px; justify-content:center;"><img src="${d.profile.picture || ''}" style="width:40px; height:40px; border-radius:50%;"><strong>${d.profile.name}</strong></div><p>URN: <code>${d.profile.sub}</code></p>`;
-            mostrarResultado('✅ Cuenta verificada y URN actualizada', 'ok');
-        } else mostrarResultado('❌ ' + d.error, 'error');
-    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
-}
-
-async function generarConIA() {
-    const tipo = document.getElementById('li_tipo').value;
-    const sku = document.getElementById('li_sku').value;
-    const contexto = document.getElementById('li_ia_contexto').value;
-    const tono = document.getElementById('li_ia_tono').value;
-    document.getElementById('spinner-ia').style.display = 'flex';
-    try {
-        const r = await fetch('../api/linkedin_generate.php', { method: 'POST', body: JSON.stringify({ tipo, sku_ref: sku, contexto, tono }) });
-        const d = await r.json();
-        if (d.ok) { document.getElementById('li_texto').value = d.texto; actualizarContador(); mostrarResultado('✅ Texto generado con Gemini', 'ok'); } 
-        else mostrarResultado('❌ ' + d.error, 'error');
-    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
-    document.getElementById('spinner-ia').style.display = 'none';
-}
-
-async function guardarPost(estado) {
-    const data = { tipo: document.getElementById('li_tipo').value, sku_ref: document.getElementById('li_sku').value, texto: document.getElementById('li_texto').value, imagen_url: document.getElementById('li_imagen_url').value, enlace: document.getElementById('li_enlace').value, fecha_programada: document.getElementById('li_fecha').value, estado: estado, ia: (modoActual === 'ia' ? 1 : 0) };
-    if (!data.texto) return mostrarResultado('⚠️ Escribe el texto del post', 'error');
-    try {
-        const r = await fetch('../api/linkedin_publish.php?accion=save', { method: 'POST', body: JSON.stringify(data) });
-        const d = await r.json();
-        if (d.ok) { mostrarResultado('✅ Post guardado en la cola', 'ok'); resetForm(); } 
-        else mostrarResultado('❌ ' + d.error, 'error');
-    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
-}
-
-async function publicarAhora() {
-    const texto = document.getElementById('li_texto').value;
-    if (!texto) return mostrarResultado('⚠️ Escribe el texto del post', 'error');
-    if (!confirm('¿Publicar este post ahora mismo en LinkedIn?')) return;
-    mostrarResultado('🚀 Publicando...', 'info');
-    const data = { tipo: document.getElementById('li_tipo').value, sku_ref: document.getElementById('li_sku').value, texto: texto, imagen_url: document.getElementById('li_imagen_url').value, enlace: document.getElementById('li_enlace').value, ia: (modoActual === 'ia' ? 1 : 0) };
-    try {
-        const r = await fetch('../api/linkedin_publish.php?accion=publish_now', { method: 'POST', body: JSON.stringify(data) });
-        const d = await r.json();
-        if (d.ok) { mostrarResultado('✅ ¡Publicado con éxito!', 'ok'); resetForm(); } 
-        else mostrarResultado('❌ ' + d.error, 'error');
-    } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); }
-}
-
-function resetForm() {
-    document.getElementById('li_texto').value = '';
-    document.getElementById('li_imagen_url').value = '';
-    document.getElementById('li_enlace').value = '';
-    document.getElementById('img-preview').style.display = 'none';
-    actualizarContador();
-}
-
-async function cargarCola(pag = 1) {
-    paginaActual = pag;
-    const estado = document.getElementById('filtro-estado').value;
-    const busq = document.getElementById('busq-cola').value;
-    try {
-        const r = await fetch(`../api/linkedin_publish.php?accion=list&pag=${pag}&estado=${estado}&busq=${busq}`);
-        const d = await r.json();
-        const tbody = document.getElementById('tbody-cola');
-        tbody.innerHTML = '';
-        if (d.items.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; opacity:0.5;">No hay posts en la cola.</td></tr>'; return; }
-        d.items.forEach(i => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td><span class="badge-type type-${i.tipo}">${i.tipo}</span></td><td title="${i.texto}">${i.texto.substring(0, 50)}...</td><td>${i.imagen_url ? `<img src="${i.imagen_url}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">` : '—'}</td><td>${i.fecha_programada || '—'}</td><td><span class="badge-status badge-${getEstadoColor(i.estado)}">${i.estado}</span></td><td>${i.generado_por_ia == 1 ? '🤖' : '👤'}</td><td><div style="display:flex; gap:5px;"><button onclick="editarPost(${i.id})" class="btn-premium-wow" style="padding:4px 8px;"><i class="fas fa-edit"></i></button><button onclick="borrarPost(${i.id})" class="btn-premium-wow" style="padding:4px 8px; background:#ef4444;"><i class="fas fa-trash"></i></button>${i.estado !== 'publicado' ? `<button onclick="publicarIndividual(${i.id})" class="btn-premium-wow" style="padding:4px 8px; background:var(--linkedin-blue);"><i class="fas fa-play"></i></button>` : ''}</div></td>`;
-            tbody.appendChild(tr);
-        });
-        const pagEl = document.getElementById('paginacion-cola');
-        pagEl.innerHTML = '';
-        for (let p = 1; p <= d.total_paginas; p++) {
-            const b = document.createElement('button'); b.textContent = p; b.className = 'btn-premium-wow' + (p === pag ? ' btn-gold' : ''); b.onclick = () => cargarCola(p); pagEl.appendChild(b);
-        }
-    } catch(e) { console.error(e); }
-}
-
-function getEstadoColor(est) { if (est === 'publicado') return 'green'; if (est === 'pendiente') return 'orange'; if (est === 'error') return 'red'; return 'gray'; }
-async function borrarPost(id) { if (!confirm('¿Eliminar este post de la cola?')) return; try { const r = await fetch(`../api/linkedin_publish.php?accion=delete&id=${id}`); const d = await r.json(); if (d.ok) cargarCola(paginaActual); } catch(e) { console.error(e); } }
-async function publicarIndividual(id) { if (!confirm('¿Publicar este post ahora?')) return; try { const r = await fetch(`../api/linkedin_publish.php?accion=publish_one&id=${id}`); const d = await r.json(); if (d.ok) { mostrarResultado('✅ ¡Publicado!', 'ok'); cargarCola(paginaActual); } else mostrarResultado('❌ ' + d.error, 'error'); } catch(e) { mostrarResultado('❌ Error: ' + e.message, 'error'); } }
-async function cargarStats() { try { const r = await fetch('../api/linkedin_publish.php?accion=stats'); const d = await r.json(); if (d.ok) { const cards = document.getElementById('stats-cards'); cards.innerHTML = `<div class="stat-card"><div class="stat-num">${d.stats.total}</div><div class="stat-lbl">Total Posts</div></div><div class="stat-card"><div class="stat-num">${d.stats.publicados}</div><div class="stat-lbl">Publicados</div></div><div class="stat-card"><div class="stat-num">${d.stats.pendientes}</div><div class="stat-lbl">Pendientes</div></div><div class="stat-card"><div class="stat-num">${d.stats.errores}</div><div class="stat-lbl">Errores</div></div>`; } } catch(e) { console.error(e); } }
-</script>

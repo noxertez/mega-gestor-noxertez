@@ -76,8 +76,8 @@ $cats = $stmtCats->fetchAll(PDO::FETCH_COLUMN);
     --brand-primary: <?= $config['primary'] ?>;
     --brand-accent: <?= $config['accent'] ?>;
 }
-body { background-color: #000 !important; }
-.nox-content { min-height: 100vh; background: #000; }
+body { background-color: #000 !important; margin: 0; padding: 0; }
+.nox-content { min-height: 100vh; background: #0f172a; border-radius: 20px; padding: 20px; margin: 20px; }
 .nox-card { border-color: var(--brand-accent) !important; }
 .btn-brand-selector {
     font-family: 'Cinzel', serif;
@@ -150,7 +150,7 @@ body { background-color: #000 !important; }
   <div style='display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:25px;'>
   <?php foreach($articulos as $art): ?>
     <div class="nox-card" style='background:rgba(255,255,255,0.03); border:1px solid var(--brand-accent);
-                border-radius:8px; overflow:hidden; transition:all 0.3s; box-shadow: 0 4px 15px rgba(0,0,0,0.5);'>
+                border-radius:12px; overflow:hidden; transition:all 0.3s; box-shadow: 0 4px 20px rgba(0,0,0,0.5);'>
 
       <!-- IMAGEN -->
       <a href="<?php echo $base_path; ?>pages/producto.php?ref=<?php echo urlencode($art['referencia']); ?>" style="text-decoration: none;">

@@ -1,0 +1,127 @@
+{
+  "name": "LinkedIn Publisher Automático - Noxertez",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 6 }]
+        }
+      },
+      "id": "node-schedule",
+      "name": "Cada 6 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost/noxertez/api/linkedin_publish.php?accion=publish_batch",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "node-http",
+      "name": "Llamar LinkedIn Publisher",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.publicados }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
+      },
+      "id": "node-check-publicados",
+      "name": "¿Se publicó algo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.errores.length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ]
+        }
+      },
+      "id": "node-check-errores",
+      "name": "¿Hay errores?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 420]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('linkedin_ok', CONCAT('LinkedIn: ', '{{ $json.publicados }}', ' post(s) publicados correctamente'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif-ok",
+      "name": "Notificación éxito",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [880, 180],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('linkedin_error', CONCAT('ERROR LinkedIn: ', '{{ JSON.stringify($json.errores) }}'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif-error",
+      "name": "Notificación error",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1100, 360],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { info: 'Sin posts pendientes en este ciclo' } }];"
+      },
+      "id": "node-nada",
+      "name": "Sin posts pendientes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 500]
+    }
+  ],
+  "connections": {
+    "Cada 6 horas": {
+      "main": [[{ "node": "Llamar LinkedIn Publisher", "type": "main", "index": 0 }]]
+    },
+    "Llamar LinkedIn Publisher": {
+      "main": [[{ "node": "¿Se publicó algo?", "type": "main", "index": 0 }]]
+    },
+    "¿Se publicó algo?": {
+      "main": [
+        [{ "node": "Notificación éxito", "type": "main", "index": 0 }],
+        [{ "node": "¿Hay errores?", "type": "main", "index": 0 }]
+      ]
+    },
+    "¿Hay errores?": {
+      "main": [
+        [{ "node": "Notificación error", "type": "main", "index": 0 }],
+        [{ "node": "Sin posts pendientes", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["linkedin", "redes-sociales", "noxertez"]
+}
