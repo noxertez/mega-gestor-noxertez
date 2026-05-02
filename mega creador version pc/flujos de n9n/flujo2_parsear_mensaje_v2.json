@@ -1,0 +1,154 @@
+{
+  "name": "02 - Parsear Mensaje WhatsApp (v2)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "parsear-mensaje",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook Parsear Mensaje",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "notes": "URL: http://localhost:5678/webhook/parsear-mensaje — Tu app manda aquí el texto copiado de WhatsApp"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\nconst texto = (body.texto || '').trim();\nconst t = texto.toLowerCase();\n\nif (!texto) {\n  return [{ json: { error: 'Texto vacío', ok: false } }];\n}\n\n// Detectar intención\nlet intencion = 'consulta';\nif (t.match(/quiero|pedir|necesito|manda|env[ií]a|dame|pedido|comprar|encarg/)) intencion = 'pedido';\nelse if (t.match(/estado|donde|cuando|llega|mi pedido|ped-/)) intencion = 'estado_pedido';\nelse if (t.match(/precio|cu[aá]nto|cuesta|vale|coste/)) intencion = 'precio';\nelse if (t.match(/stock|quedan|hay|disponible|tienes/)) intencion = 'stock';\n\n// Detectar número de pedido mencionado\nconst pedidoMencionado = (texto.match(/PED-\\d+/i) || [])[0] || null;\n\n// Extraer items con cantidad\nconst patronCantidad = /(\\d+)\\s*(?:x|de|uds?|unidades?|piezas?)?\\s*([a-záéíóúñA-ZÁÉÍÓÚÑ0-9\\s\\-\\/]{3,50})/gi;\nconst itemsEncontrados = [];\nlet match;\nwhile ((match = patronCantidad.exec(texto)) !== null) {\n  const cantidad = parseInt(match[1]);\n  const producto = match[2].trim().replace(/\\s+/g, ' ');\n  if (cantidad > 0 && cantidad < 1000 && producto.length > 2) {\n    itemsEncontrados.push({ cantidad, descripcion: producto });\n  }\n}\n\n// Extraer teléfono si viene\nconst telMatch = texto.match(/(?:\\+34|0034)?\\s*[6789]\\d{8}/);\nconst telefono = telMatch ? telMatch[0].replace(/\\s/g, '') : (body.telefono || '');\n\nreturn [{ json: {\n  ok: true,\n  intencion,\n  texto_original: texto,\n  telefono,\n  nombre: body.nombre || '',\n  items_detectados: itemsEncontrados,\n  pedido_mencionado: pedidoMencionado,\n  timestamp: new Date().toISOString()\n}}];"
+      },
+      "id": "node-parsear",
+      "name": "Parsear texto del mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [{ "leftValue": "={{ $json.intencion }}", "rightValue": "pedido", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "pedido"
+            },
+            {
+              "conditions": {
+                "options": {},
+                "conditions": [{ "leftValue": "={{ $json.intencion }}", "rightValue": "estado_pedido", "operator": { "type": "string", "operation": "equals" } }]
+              },
+              "renameOutput": true,
+              "outputKey": "estado"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "node-switch",
+      "name": "Enrutar por intención",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst numeroPedido = 'PED-' + Date.now();\nconst items = d.items_detectados.map(item => ({\n  referencia: 'PENDIENTE',\n  nombre: item.descripcion,\n  cantidad: item.cantidad,\n  precio_unit: 0,\n  subtotal: 0\n}));\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: d.telefono,\n  nombre_cliente: d.nombre || 'Por identificar',\n  items_json: JSON.stringify(items),\n  estado: 'borrador',\n  fecha_pedido: d.timestamp.slice(0, 19).replace('T', ' '),\n  canal: 'whatsapp_manual',\n  canal_origen: 'whatsapp',\n  notas: 'Parseado automáticamente. Revisar precios y referencias. Texto: ' + d.texto_original.substring(0, 200)\n}}];"
+      },
+      "id": "node-crear-borrador",
+      "name": "Crear borrador pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 160]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, items_json, total, estado, fecha_pedido, canal, canal_origen, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.items_json }}', 0, 'borrador', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.canal_origen }}', '{{ $json.notas }}')",
+        "options": {}
+      },
+      "id": "node-guardar-borrador",
+      "name": "Guardar borrador MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1100, 160],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, intencion: 'pedido', items_detectados: $('Parsear texto del mensaje').first().json.items_detectados, numero_pedido: $('Crear borrador pedido').first().json.numero_pedido, mensaje: 'Borrador creado. Revisa y completa precios en la app.' }) }}"
+      },
+      "id": "node-resp-pedido",
+      "name": "Responder: borrador creado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1320, 160]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT numero_pedido, estado, fecha_pedido, total FROM pedidos WHERE (numero_pedido = '{{ $json.pedido_mencionado }}' OR (telefono = '{{ $json.telefono }}' AND telefono != '')) ORDER BY fecha_pedido DESC LIMIT 3",
+        "options": {}
+      },
+      "id": "node-buscar-estado",
+      "name": "Buscar estado pedido",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [880, 360],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, intencion: 'estado_pedido', pedidos: $input.all().map(i => i.json), mensaje: 'Pedidos encontrados' }) }}"
+      },
+      "id": "node-resp-estado",
+      "name": "Responder: estado pedidos",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 360]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, intencion: $('Parsear texto del mensaje').first().json.intencion, items_detectados: $('Parsear texto del mensaje').first().json.items_detectados, mensaje: 'Mensaje analizado. Intención: ' + $('Parsear texto del mensaje').first().json.intencion }) }}"
+      },
+      "id": "node-resp-otro",
+      "name": "Responder: otro tipo",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [880, 540]
+    }
+  ],
+  "connections": {
+    "Webhook Parsear Mensaje": {
+      "main": [[{ "node": "Parsear texto del mensaje", "type": "main", "index": 0 }]]
+    },
+    "Parsear texto del mensaje": {
+      "main": [[{ "node": "Enrutar por intención", "type": "main", "index": 0 }]]
+    },
+    "Enrutar por intención": {
+      "main": [
+        [{ "node": "Crear borrador pedido", "type": "main", "index": 0 }],
+        [{ "node": "Buscar estado pedido", "type": "main", "index": 0 }],
+        [{ "node": "Responder: otro tipo", "type": "main", "index": 0 }]
+      ]
+    },
+    "Crear borrador pedido": {
+      "main": [[{ "node": "Guardar borrador MySQL", "type": "main", "index": 0 }]]
+    },
+    "Guardar borrador MySQL": {
+      "main": [[{ "node": "Responder: borrador creado", "type": "main", "index": 0 }]]
+    },
+    "Buscar estado pedido": {
+      "main": [[{ "node": "Responder: estado pedidos", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["whatsapp", "parsear", "pedidos", "noxertez"]
+}

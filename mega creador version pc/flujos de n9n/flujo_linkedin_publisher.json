@@ -4,11 +4,20 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "hours", "hoursInterval": 6 }]
+          "interval": [
+            {
+              "triggerAtHour": 12,
+              "triggerAtMinute": 0
+            },
+            {
+              "triggerAtHour": 18,
+              "triggerAtMinute": 0
+            }
+          ]
         }
       },
       "id": "node-schedule",
-      "name": "Cada 6 horas",
+      "name": "Sincronización Web",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [200, 300]

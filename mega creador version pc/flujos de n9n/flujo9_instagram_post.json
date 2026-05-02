@@ -1,0 +1,184 @@
+{
+  "name": "09 - Instagram Auto-Post desde Mockups",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 9,15,21 * * *" }]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Publicar 3 veces al día (9h, 15h, 21h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "Publica 1 mockup en Instagram a las 9h, 15h y 21h"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT m.id, m.ruta, m.archivo, m.estancia, m.estilo, m.decoracion, m.formato, m.marca_noxertez, m.marca_candleholder, m.marca_zen, a.nombre as nombre_producto, a.descripcion as desc_producto, a.categoria FROM mockups_varios m LEFT JOIN mockups_vinculaciones mv ON mv.mockup_id = m.id LEFT JOIN articulos a ON mv.sku = a.referencia WHERE m.publicado_instagram IS NULL ORDER BY m.veces_usado ASC, RAND() LIMIT 1",
+        "options": {}
+      },
+      "id": "node-buscar-mockup",
+      "name": "Buscar mockup no publicado en Instagram",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [440, 300],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } },
+      "notes": "Coge el mockup con menos usos que aún no se ha publicado en Instagram"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      },
+      "id": "node-hay-mockup",
+      "name": "¿Hay mockup disponible?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\n\n// Convertir ruta local a URL pública\n// La ruta en DB es tipo: mockups/ARCHIVO.jpg o ruta completa Windows\nlet rutaRaw = d.ruta || d.archivo || '';\nlet imageUrl = '';\n\nif (rutaRaw.startsWith('http')) {\n  imageUrl = rutaRaw;\n} else {\n  // Limpiar ruta Windows y convertir a URL\n  rutaRaw = rutaRaw.replace(/\\\\/g, '/');\n  // Quitar partes de ruta local hasta encontrar 'mockups' o 'imagenes'\n  const partesMockups = rutaRaw.split('mockups/');\n  const partesImagenes = rutaRaw.split('imagenes/');\n  \n  if (partesMockups.length > 1) {\n    imageUrl = 'https://noxertez.com/mockups/' + partesMockups[partesMockups.length - 1];\n  } else if (partesImagenes.length > 1) {\n    imageUrl = 'https://noxertez.com/imagenes/' + partesImagenes[partesImagenes.length - 1];\n  } else {\n    // Último recurso: usar el nombre de archivo directamente\n    const archivo = rutaRaw.split('/').pop().split('\\\\').pop();\n    imageUrl = 'https://noxertez.com/mockups/' + archivo;\n  }\n}\n\n// Detectar marca\nconst marcas = [];\nif (d.marca_noxertez == 1) marcas.push('Noxertez');\nif (d.marca_candleholder == 1) marcas.push('Candleholder');\nif (d.marca_zen == 1) marcas.push('Zen Garden');\nconst marca = marcas[0] || 'Noxertez';\n\n// Datos del mockup\nconst estancia = d.estancia || 'hogar';\nconst estilo = d.estilo || '';\nconst decoracion = d.decoracion || '';\nconst producto = d.nombre_producto || '';\n\n// Hashtags por estancia\nconst hashtagsEstancia = {\n  'salon': '#DecoSalon #LivingRoom #DecoracionSalon',\n  'dormitorio': '#DecoDormitorio #Bedroom #DecoHabitacion',\n  'cocina': '#DecoKitchen #Cocina #CocinaDecoracion',\n  'bano': '#DecoBano #BathroomDecor #Bano',\n  'oficina': '#DecoOficina #HomeOffice #OficinaEnCasa',\n  'exterior': '#DecoExterior #JardinDeco #TerrazaDeco'\n};\nconst htEstancia = hashtagsEstancia[estancia.toLowerCase()] || '#DecoHogar #HomeDecor';\n\n// Generar caption\nconst captions = [\n  `✨ ${producto ? producto + ' en tu ' + estancia : 'Decoración artesanal para tu ' + estancia} 🏠\\n\\nCada pieza de ${marca} está hecha a mano con madera natural. Única e irrepetible. 🪵\\n\\n${htEstancia} #${marca} #MaderaArtesanal #HechoAMano #DecoracionHogar #ArtesaniaEspana`,\n  `🪵 Madera natural. Diseño único. Hogar con alma.\\n\\n${producto ? 'Nuestro ' + producto + ' transforma cualquier ' + estancia + ' en un espacio especial.' : 'Transforma tu ' + estancia + ' con nuestras creaciones artesanales.'}\\n\\n#${marca} #WoodDecor #MaderaDecoracion ${htEstancia} #HandmadeSpain #ArtesaniaEspañola`,\n  `💛 Porque tu hogar merece lo mejor.\\n\\n${producto || 'Decoración artesanal'} para tu ${estancia} — diseñado y fabricado a mano en España. 🌿\\n\\n#${marca} #DecoNatural #MaderaViva ${htEstancia} #EcoDecor #SostenibleYBello`\n];\n\n// Rotar caption según hora del día\nconst hora = new Date().getHours();\nconst idxCaption = hora < 12 ? 0 : hora < 18 ? 1 : 2;\nconst caption = captions[idxCaption];\n\nreturn [{ json: {\n  mockup_id: d.id,\n  image_url: imageUrl,\n  caption,\n  marca,\n  estancia\n}}];"
+      },
+      "id": "node-preparar",
+      "name": "Preparar imagen y caption",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ID }}/media",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "image_url", "value": "={{ $json.image_url }}" },
+            { "name": "caption", "value": "={{ $json.caption }}" },
+            { "name": "access_token", "value": "={{ $vars.INSTAGRAM_ACCESS_TOKEN }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "node-crear-container",
+      "name": "Crear contenedor Instagram (paso 1)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 180],
+      "notes": "Sube la imagen a Instagram. Devuelve un container ID."
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "id": "node-esperar",
+      "name": "Esperar 15 segundos",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1320, 180],
+      "notes": "Instagram necesita tiempo para procesar la imagen antes de publicar"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ID }}/media_publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "creation_id", "value": "={{ $('Crear contenedor Instagram (paso 1)').first().json.id }}" },
+            { "name": "access_token", "value": "={{ $vars.INSTAGRAM_ACCESS_TOKEN }}" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "node-publicar",
+      "name": "Publicar en Instagram (paso 2)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 180]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE mockups_varios SET publicado_instagram = NOW(), veces_usado = veces_usado + 1, ultima_vez_usado = NOW() WHERE id = {{ $('Preparar imagen y caption').first().json.mockup_id }}",
+        "options": {}
+      },
+      "id": "node-marcar",
+      "name": "Marcar mockup publicado en Instagram",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1760, 180],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('instagram_post', CONCAT('📸 Instagram: mockup publicado - ', '{{ $('Preparar imagen y caption').first().json.estancia }}', ' (ID: ', '{{ $('Preparar imagen y caption').first().json.mockup_id }}', ')'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif",
+      "name": "Notificación publicación",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1980, 180],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('instagram_agotado', '⚠️ Instagram: No quedan mockups sin publicar. Todos ya fueron publicados.', NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-agotado",
+      "name": "Notificación mockups agotados",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [880, 420],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } },
+      "notes": "Cuando todos los mockups ya se publicaron, avisa para que añadas más"
+    }
+  ],
+  "connections": {
+    "Publicar 3 veces al día (9h, 15h, 21h)": {
+      "main": [[{ "node": "Buscar mockup no publicado en Instagram", "type": "main", "index": 0 }]]
+    },
+    "Buscar mockup no publicado en Instagram": {
+      "main": [[{ "node": "¿Hay mockup disponible?", "type": "main", "index": 0 }]]
+    },
+    "¿Hay mockup disponible?": {
+      "main": [
+        [{ "node": "Preparar imagen y caption", "type": "main", "index": 0 }],
+        [{ "node": "Notificación mockups agotados", "type": "main", "index": 0 }]
+      ]
+    },
+    "Preparar imagen y caption": {
+      "main": [[{ "node": "Crear contenedor Instagram (paso 1)", "type": "main", "index": 0 }]]
+    },
+    "Crear contenedor Instagram (paso 1)": {
+      "main": [[{ "node": "Esperar 15 segundos", "type": "main", "index": 0 }]]
+    },
+    "Esperar 15 segundos": {
+      "main": [[{ "node": "Publicar en Instagram (paso 2)", "type": "main", "index": 0 }]]
+    },
+    "Publicar en Instagram (paso 2)": {
+      "main": [[{ "node": "Marcar mockup publicado en Instagram", "type": "main", "index": 0 }]]
+    },
+    "Marcar mockup publicado en Instagram": {
+      "main": [[{ "node": "Notificación publicación", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["instagram", "mockups", "social", "noxertez"]
+}

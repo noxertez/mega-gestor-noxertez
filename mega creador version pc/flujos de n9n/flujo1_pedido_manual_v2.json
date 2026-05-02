@@ -1,0 +1,82 @@
+{
+  "name": "01 - Pedido Manual desde App Noxertez (v2)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nuevo-pedido",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook Pedido Manual",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "notes": "URL: http://localhost:5678/webhook/nuevo-pedido — Tu app llama aquí al crear un pedido"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\nif (!body.items || body.items.length === 0) {\n  throw new Error('El pedido no tiene artículos');\n}\n\nconst numeroPedido = 'PED-' + Date.now();\nlet total = 0;\n\nconst items = body.items.map(item => {\n  const subtotal = (parseFloat(item.precio) || 0) * (parseInt(item.cantidad) || 1);\n  total += subtotal;\n  return {\n    referencia: item.referencia || item.sku || 'SIN-REF',\n    nombre: item.nombre || item.referencia || 'Artículo sin nombre',\n    cantidad: parseInt(item.cantidad) || 1,\n    precio_unit: parseFloat(item.precio) || 0,\n    subtotal: subtotal\n  };\n});\n\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: body.telefono || '',\n  nombre_cliente: body.cliente || body.nombre_cliente || 'Cliente sin nombre',\n  id_cliente: body.id_cliente || null,\n  items_json: JSON.stringify(items),\n  total: parseFloat(total.toFixed(2)),\n  estado: 'pendiente',\n  fecha_pedido: new Date().toISOString().slice(0, 19).replace('T', ' '),\n  canal: body.canal || 'manual',\n  canal_origen: body.canal_origen || 'directo',\n  notas: body.notas || ''\n}}];"
+      },
+      "id": "node-preparar",
+      "name": "Preparar datos pedido",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, id_cliente, items_json, total, estado, fecha_pedido, canal, canal_origen, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', {{ $json.id_cliente || 'NULL' }}, '{{ $json.items_json }}', {{ $json.total }}, '{{ $json.estado }}', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.canal_origen }}', '{{ $json.notas }}')",
+        "options": {}
+      },
+      "id": "node-mysql",
+      "name": "Guardar en MySQL",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('pedido_nuevo', CONCAT('📦 Nuevo pedido manual: ', '{{ $json.numero_pedido }}', ' - ', '{{ $json.nombre_cliente }}', ' (', '{{ $json.total }}', '€)'), NOW(), 0)",
+        "options": {}
+      },
+      "id": "node-notif",
+      "name": "Notificación nuevo pedido",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [880, 300],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, numero_pedido: $('Preparar datos pedido').first().json.numero_pedido, total: $('Preparar datos pedido').first().json.total, mensaje: 'Pedido guardado correctamente' }) }}"
+      },
+      "id": "node-responder",
+      "name": "Responder a la app",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Pedido Manual": {
+      "main": [[{ "node": "Preparar datos pedido", "type": "main", "index": 0 }]]
+    },
+    "Preparar datos pedido": {
+      "main": [[{ "node": "Guardar en MySQL", "type": "main", "index": 0 }]]
+    },
+    "Guardar en MySQL": {
+      "main": [[{ "node": "Notificación nuevo pedido", "type": "main", "index": 0 }]]
+    },
+    "Notificación nuevo pedido": {
+      "main": [[{ "node": "Responder a la app", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": ["pedidos", "manual", "noxertez"]
+}

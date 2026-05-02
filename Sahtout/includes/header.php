@@ -433,6 +433,9 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
                     <a href="<?php echo $base_path; ?>pages/pedidos.php" class="admin-nav-btn" style="background:rgba(124,58,237,0.3)">
                         <i class="fas fa-box"></i> Pedidos
                     </a>
+                    <a href="<?php echo $base_path; ?>pages/seguimientos.php" class="admin-nav-btn" style="background:rgba(16,185,129,0.3)">
+                        <i class="fas fa-shipping-fast"></i> Seguimientos
+                    </a>
                     <a href="<?php echo $base_path; ?>pages/kanban.php" class="admin-nav-btn" style="background:rgba(34,197,94,0.2)">
                         <i class="fas fa-tasks"></i> Kanban
                     </a>
@@ -505,15 +508,18 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
     var BASE = '<?php echo htmlspecialchars($base_path); ?>';
     var API  = BASE + 'api/notificaciones.php';
 
-    // Mapa de tipos → icono + color
+    // Mapa de tipos → icono + emoji + color
     var TIPO_MAP = {
-        'stock':     { icon: 'fa-warehouse',      color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
-        'pedido':    { icon: 'fa-box',             color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
-        'error':     { icon: 'fa-exclamation-circle', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
-        'linkedin':  { icon: 'fab fa-linkedin',    color: '#0a66c2', bg: 'rgba(10,102,194,0.15)' },
-        'sistema':   { icon: 'fa-cog',             color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
-        'seguimiento':{ icon: 'fa-truck',          color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
-        'default':   { icon: 'fa-bell',            color: '#d4af37', bg: 'rgba(212,175,55,0.15)' }
+        'stock_bajo':          { emoji: '⚠️', icon: 'fa-warehouse',      color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+        'resumen_diario':       { emoji: '📊', icon: 'fa-chart-bar',      color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)' },
+        'pedido_nuevo':         { emoji: '📦', icon: 'fa-box',             color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
+        'pedido_email':         { emoji: '📧', icon: 'fa-envelope',        color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
+        'influencer_nuevo':     { emoji: '🌟', icon: 'fa-star',            color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+        'linkedin_ok':          { emoji: '✅', icon: 'fab fa-linkedin',    color: '#0a66c2', bg: 'rgba(10,102,194,0.15)' },
+        'seguimiento_postventa':{ emoji: '📬', icon: 'fa-truck',          color: '#10b981', bg: 'rgba(16,185,129,0.15)' },
+        'correo_info':          { emoji: 'ℹ️', icon: 'fa-info-circle',     color: '#3b82f6', bg: 'rgba(59,130,246,0.15)' },
+        'correo_ayuda':         { emoji: '🆘', icon: 'fa-life-ring',       color: '#ef4444', bg: 'rgba(239,68,68,0.15)' },
+        'default':              { emoji: '🔔', icon: 'fa-bell',            color: '#d4af37', bg: 'rgba(212,175,55,0.15)' }
     };
 
     function getTipo(tipo) {
@@ -523,7 +529,7 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
 
     // Actualizar badge
     function noxActualizarBadge() {
-        fetch(API + '?action=count', { cache: 'no-store' })
+        fetch(API + '?accion=count', { cache: 'no-store' })
             .then(function(r){ return r.json(); })
             .then(function(d){
                 var badge = document.getElementById('nox-bell-badge');
@@ -554,11 +560,11 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
                 ? '<button class="nox-btn-read" onclick="noxMarcarLeida(' + n.id + ',this)">Marcar leída</button>'
                 : '<span style="color:#22c55e;font-size:0.65rem;">✔ Leída</span>';
             html += '<div class="nox-notif-item' + unread + '" id="notif-' + n.id + '">' +
-                '<div class="nox-notif-icon" style="background:' + t.bg + '; color:' + t.color + '">' +
-                    '<i class="fas ' + t.icon + '"></i>' +
+                '<div class="nox-notif-icon" style="background:' + t.bg + '; color:' + t.color + '; font-size: 1.2rem;">' +
+                    t.emoji +
                 '</div>' +
                 '<div class="nox-notif-body">' +
-                    '<div class="nox-notif-tipo" style="color:' + t.color + '">' + escHTML(n.tipo) + '</div>' +
+                    '<div class="nox-notif-tipo" style="color:' + t.color + '">' + t.emoji + ' ' + escHTML(n.tipo) + '</div>' +
                     '<div class="nox-notif-msg">' + escHTML(n.mensaje) + '</div>' +
                     '<div class="nox-notif-fecha"><i class="fas fa-clock" style="margin-right:4px;"></i>' + escHTML(n.fecha_fmt) + '</div>' +
                 '</div>' +
@@ -576,7 +582,7 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
     function noxCargarNotificaciones() {
         var list = document.getElementById('nox-notif-list');
         if (list) list.innerHTML = '<div class="nox-notif-empty"><i class="fas fa-spinner fa-spin"></i>Cargando...</div>';
-        fetch(API + '?action=list', { cache: 'no-store' })
+        fetch(API + '?accion=listar', { cache: 'no-store' })
             .then(function(r){ return r.json(); })
             .then(function(d){ noxRenderList(d.notificaciones || []); })
             .catch(function(){
@@ -588,7 +594,7 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
     // Marcar una como leída
     window.noxMarcarLeida = function(id, btn) {
         var fd = new FormData();
-        fd.append('action', 'marcar_leida');
+        fd.append('accion', 'marcar_leida');
         fd.append('id', id);
         fetch(API, { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
@@ -610,7 +616,7 @@ $current_lang_flag = $languages[$current_lang]['flag_url'];
     // Marcar todas
     window.noxMarcarTodas = function() {
         var fd = new FormData();
-        fd.append('action', 'marcar_todas');
+        fd.append('accion', 'marcar_todas');
         fetch(API, { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
             .then(function(d){

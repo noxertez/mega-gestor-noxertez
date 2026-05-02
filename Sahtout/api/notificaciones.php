@@ -3,7 +3,8 @@ define('ALLOWED_ACCESS', true);
 require_once __DIR__ . '/config.php';
 
 $pdo = conectar();
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
+// Soporte para ambos parámetros: 'accion' (pedido por el usuario) y 'action' (compatibilidad)
+$action = $_GET['accion'] ?? $_POST['accion'] ?? $_GET['action'] ?? $_POST['action'] ?? '';
 
 switch ($action) {
 
@@ -13,12 +14,14 @@ switch ($action) {
         jsonSalida(['total' => (int)$stmt->fetchColumn()]);
         break;
 
-    // --- GET: listar todas ---
+    // --- GET: listar no leídas (según el prompt, listar devuelve las no leídas) ---
+    case 'listar':
     case 'list':
         $stmt = $pdo->query(
             "SELECT id, tipo, mensaje, leida,
                     DATE_FORMAT(fecha, '%d/%m/%Y %H:%i') AS fecha_fmt
              FROM notificaciones
+             WHERE leida = 0
              ORDER BY fecha DESC
              LIMIT 100"
         );
@@ -27,7 +30,7 @@ switch ($action) {
 
     // --- POST: marcar una como leída ---
     case 'marcar_leida':
-        $id = (int)($_POST['id'] ?? 0);
+        $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
         if ($id <= 0) {
             http_response_code(400);
             jsonSalida(['error' => 'ID inválido']);
@@ -45,5 +48,5 @@ switch ($action) {
 
     default:
         http_response_code(400);
-        jsonSalida(['error' => 'Acción no reconocida. Usa: count, list, marcar_leida, marcar_todas']);
+        jsonSalida(['error' => 'Acción no reconocida. Usa: count, listar, marcar_leida, marcar_todas']);
 }

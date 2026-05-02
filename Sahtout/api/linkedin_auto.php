@@ -110,10 +110,10 @@ if ($accion === 'generate_one') {
         $texto = "Descubre nuestra colección de decoración artesanal para tu " . ($m['estancia'] ?: 'hogar') . ". #Noxertez #Artesania #Decoracion";
     }
     
-    // 4. Calcular fecha (3 al día)
-    $dias_offset = floor($index / 3);
-    $slot_idx = $index % 3;
-    $slots = ['09:00:00', '15:00:00', '21:00:00'];
+    // 4. Calcular fecha (2 al día)
+    $dias_offset = floor($index / 2);
+    $slot_idx = $index % 2;
+    $slots = ['11:45:00', '17:45:00'];
     $fecha_prog = date('Y-m-d', strtotime("tomorrow +$dias_offset days")) . ' ' . $slots[$slot_idx];
     
     // 5. Guardar
