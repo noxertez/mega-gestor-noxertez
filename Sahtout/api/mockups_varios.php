@@ -74,6 +74,96 @@ if ($accion === 'desvincular_multiple') {
     echo json_encode(['status'=>'ok']);
 }
 
+if ($accion === 'get_filters') {
+    $res = [
+        'estancias' => $db->query("SELECT DISTINCT estancia FROM mockups_varios WHERE estancia != '' ORDER BY estancia")->fetchAll(PDO::FETCH_COLUMN),
+        'estilos' => $db->query("SELECT DISTINCT estilo FROM mockups_varios WHERE estilo != '' ORDER BY estilo")->fetchAll(PDO::FETCH_COLUMN),
+        'decoraciones' => $db->query("SELECT DISTINCT decoracion FROM mockups_varios WHERE decoracion != '' ORDER BY decoracion")->fetchAll(PDO::FETCH_COLUMN),
+    ];
+    echo json_encode($res);
+    exit;
+}
+
+if ($accion === 'estadisticas') {
+    // 1. Totales generales
+    $totalMockups   = $db->query("SELECT COUNT(*) FROM mockups_varios")->fetchColumn();
+    $totalImagenes  = $db->query("SELECT COUNT(*) FROM mockups_varios WHERE tipo='imagen'")->fetchColumn();
+    $totalVideos    = $db->query("SELECT COUNT(*) FROM mockups_varios WHERE tipo='video'")->fetchColumn();
+    $totalVinc      = $db->query("SELECT COUNT(DISTINCT sku) FROM mockups_vinculaciones")->fetchColumn();
+    $totalArticulos = $db->query("SELECT COUNT(*) FROM articulos WHERE es_variante='BASE' OR referencia REGEXP 'P01$'")->fetchColumn();
+    $sinMockup      = (int)$totalArticulos - (int)$totalVinc;
+
+    // 2. Ranking de artículos por número de mockups (top 30)
+    $rankingStmt = $db->query("
+        SELECT a.referencia, a.nombre, a.foto_portada, a.categoria,
+               COUNT(DISTINCT mv.id) as total_mockups
+        FROM articulos a
+        LEFT JOIN mockups_vinculaciones mv_v ON mv_v.sku = a.referencia
+        LEFT JOIN mockups_varios mv ON mv.id = mv_v.mockup_id
+        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP 'P01$')
+        GROUP BY a.referencia, a.nombre, a.foto_portada, a.categoria
+        ORDER BY total_mockups DESC
+        LIMIT 50
+    ");
+    $ranking = $rankingStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 3. Artículos SIN ningún mockup (los que más necesitan)
+    $sinMockupStmt = $db->query("
+        SELECT a.referencia, a.nombre, a.foto_portada, a.categoria
+        FROM articulos a
+        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP 'P01$')
+          AND a.referencia NOT IN (SELECT DISTINCT sku FROM mockups_vinculaciones)
+        ORDER BY a.categoria, a.referencia
+        LIMIT 40
+    ");
+    $articulosSinMockup = $sinMockupStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 4. Estadísticas por categoría
+    $catStmt = $db->query("
+        SELECT a.categoria,
+               COUNT(DISTINCT a.referencia) as total_arts,
+               COUNT(DISTINCT mv_v.sku) as arts_con_mockup,
+               COUNT(DISTINCT mv.id) as total_mockups
+        FROM articulos a
+        LEFT JOIN mockups_vinculaciones mv_v ON mv_v.sku = a.referencia
+        LEFT JOIN mockups_varios mv ON mv.id = mv_v.mockup_id
+        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP 'P01$')
+          AND a.categoria != ''
+        GROUP BY a.categoria
+        ORDER BY total_mockups DESC
+    ");
+    $porCategoria = $catStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 5. Distribución por calidad
+    $calidadStmt = $db->query("
+        SELECT calidad, COUNT(*) as total FROM mockups_varios GROUP BY calidad ORDER BY total DESC
+    ");
+    $porCalidad = $calidadStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 6. Distribución por estancia (top 10)
+    $estanciaStmt = $db->query("
+        SELECT estancia, COUNT(*) as total FROM mockups_varios WHERE estancia != '' GROUP BY estancia ORDER BY total DESC LIMIT 10
+    ");
+    $porEstancia = $estanciaStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'totales'            => [
+            'mockups'       => (int)$totalMockups,
+            'imagenes'      => (int)$totalImagenes,
+            'videos'        => (int)$totalVideos,
+            'articulos'     => (int)$totalArticulos,
+            'con_mockup'    => (int)$totalVinc,
+            'sin_mockup'    => max(0, $sinMockup),
+        ],
+        'ranking'            => $ranking,
+        'sin_mockup'         => $articulosSinMockup,
+        'por_categoria'      => $porCategoria,
+        'por_calidad'        => $porCalidad,
+        'por_estancia'       => $porEstancia,
+    ]);
+    exit;
+}
+
 if ($accion === 'eliminar') {
     $stmt = $db->prepare("SELECT ruta FROM mockups_varios WHERE id = ?");
     $stmt->execute([$_POST['id']]);
