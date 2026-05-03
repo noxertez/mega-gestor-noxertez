@@ -280,9 +280,42 @@ $current_tab = $_GET['tab'] ?? 'bloc';
         <div id="tab-comandos" class="tab-container <?php echo ($current_tab == 'comandos') ? 'active' : ''; ?>">
             <h3 style="color: var(--accent-gold); margin-bottom: 15px;">Comandos Disponibles</h3>
             <div style="background:rgba(0,0,0,0.2); padding:10px; border-radius:12px;">
-                <div style="padding:10px; border-bottom:1px solid var(--border-glass);">"Dime las ventas de hoy"</div>
-                <div style="padding:10px; border-bottom:1px solid var(--border-glass);">"Anotar nota: [texto]"</div>
-                <div style="padding:10px; border-bottom:1px solid var(--border-glass);">"¿Qué pedidos tengo pendientes?"</div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:var(--accent-gold); font-size:0.75rem; opacity:0.7; min-width:70px;">UBICACIÓN</span>
+                    <span>"¿Dónde están los corazones?"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:var(--accent-gold); font-size:0.75rem; opacity:0.7; min-width:70px;">UBICACIÓN</span>
+                    <span>"¿Dónde está el NOX-COR-001?"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:var(--accent-gold); font-size:0.75rem; opacity:0.7; min-width:70px;">UBICACIÓN</span>
+                    <span>"Busca la tabla de caoba"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:#60a5fa; font-size:0.75rem; opacity:0.7; min-width:70px;">STOCK</span>
+                    <span>"¿Cuánto stock hay de X?"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:#60a5fa; font-size:0.75rem; opacity:0.7; min-width:70px;">PEDIDOS</span>
+                    <span>"¿Qué pedidos tengo pendientes?"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:#10b981; font-size:0.75rem; opacity:0.7; min-width:70px;">VENTAS</span>
+                    <span>"Dime las ventas de hoy"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:#f59e0b; font-size:0.75rem; opacity:0.7; min-width:70px;">NOTAS</span>
+                    <span>"Anotar que falta X"</span>
+                </div>
+                <div style="padding:10px; border-bottom:1px solid var(--border-glass); display:flex; align-items:center; gap:10px;">
+                    <span style="color:#a78bfa; font-size:0.75rem; opacity:0.7; min-width:70px;">TAREAS</span>
+                    <span>"¿Qué tareas tengo pendientes?"</span>
+                </div>
+                <div style="padding:10px; display:flex; align-items:center; gap:10px;">
+                    <span style="color:#f87171; font-size:0.75rem; opacity:0.7; min-width:70px;">ALERTAS</span>
+                    <span>"¿Hay notificaciones?"</span>
+                </div>
             </div>
         </div>
     </div>
@@ -304,6 +337,31 @@ $current_tab = $_GET['tab'] ?? 'bloc';
 
 <script>
 let currentEditingId = null;
+
+// ─── Speech Synthesis: cargar voces en español ───────────────────────────────
+let availableVoices = [];
+function cargarVoces() {
+    availableVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+}
+if (window.speechSynthesis) {
+    cargarVoces();
+    window.speechSynthesis.onvoiceschanged = cargarVoces;
+}
+
+function hablarRespuesta(texto) {
+    if (!window.speechSynthesis || !texto) return;
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    const vozES = availableVoices.find(v => v.lang.startsWith('es') && v.name.toLowerCase().includes('fem'))
+               || availableVoices.find(v => v.lang.startsWith('es'))
+               || null;
+    if (vozES) utterance.voice = vozES;
+    synth.cancel();
+    synth.speak(utterance);
+}
 
 function switchTab(paneId, el, tabName) {
     document.querySelectorAll('.tab-container').forEach(p => p.classList.remove('active'));
@@ -437,7 +495,7 @@ async function procesarVoz(texto) {
     document.getElementById('response').innerText = "Procesando...";
     
     try {
-        const res = await fetch('<?php echo $base_path; ?>api/index.php?ruta=asistente', {
+        const res = await fetch('http://localhost:5678/webhook/asistente', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ texto })
@@ -445,12 +503,13 @@ async function procesarVoz(texto) {
         const data = await res.json();
         document.getElementById('response').innerText = data.respuesta;
         document.getElementById('transcript').innerText = ""; // Limpiar tras procesar
+        // ── Leer en voz alta la respuesta ──
+        hablarRespuesta(data.respuesta);
         if (data.accion === 'reload_tasks') {
-            // Recargar solo la parte de las tareas sin F5 total para mejor UX
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => location.reload(), 2000);
         }
     } catch (e) {
-        document.getElementById('response').innerText = "Error en el servidor.";
+        document.getElementById('response').innerText = "Error conectando con el asistente.";
     }
 }
 </script>

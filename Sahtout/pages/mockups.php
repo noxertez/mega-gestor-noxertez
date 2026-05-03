@@ -68,7 +68,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'get_articles') {
     $cat = $_GET['categoria'] ?? ''; $soloBase = ($_GET['solo_base'] ?? 'true') === 'true';
     $where = ["1=1"]; $params = [];
     if ($cat !== '__TODAS__' && !empty($cat)) { $where[] = "categoria = ?"; $params[] = $cat; }
-    if ($soloBase) $where[] = "(es_variante = 'BASE' OR referencia REGEXP 'P01$' OR referencia REGEXP 'P01-')";
+    if ($soloBase) $where[] = "(es_variante = 'BASE' OR referencia REGEXP '[Pp]01$' OR referencia REGEXP '[Pp]01-')";
     $sql = "SELECT referencia, nombre, foto_portada FROM articulos WHERE " . implode(" AND ", $where) . " ORDER BY referencia ASC";
     $stmt = $db->prepare($sql); $stmt->execute($params);
     $articulos = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -223,9 +223,21 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
 .stats-two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media(max-width:900px){.stats-two-col{grid-template-columns:1fr;} .bar-label{flex:0 0 130px;} }
 
-.detail-mock-card { background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:10px; overflow:hidden; transition:.3s; }
-.detail-mock-card:hover { transform:translateY(-3px); border-color:var(--accent-gold); background:rgba(255,255,255,0.06); }
-.detail-mock-img { height:160px; width:100%; object-fit:cover; cursor:pointer; }
+.btn-mini{padding:4px 8px; font-size:0.7rem; width:auto; flex:none; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); border-radius:4px; color:#94a3b8; transition:.2s; line-height:1;}
+.btn-mini:hover{background:var(--accent-gold); color:#000; border-color:var(--accent-gold);}
+.btn-mini.active{background:var(--accent-gold); color:#000; border-color:var(--accent-gold);}
+.stats-header{display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); margin-bottom:20px; padding-bottom:12px;}
+.stats-header h3{border:none; margin:0; padding:0;}
+
+/* Art Detail Gallery */
+.detail-mock-card { background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); border-radius:12px; overflow:hidden; transition:.3s; }
+.detail-mock-card:hover { border-color:var(--accent-gold); transform:translateY(-3px); background:rgba(255,255,255,0.06); }
+.detail-mock-img { width:100%; height:180px; object-fit:cover; cursor:pointer; display:block; }
+.detail-mock-info { padding:12px; display:flex; justify-content:space-between; align-items:center; }
+
+/* Mini thumbnails (Stock style) */
+.img-mini-wow { width:32px; height:32px; border-radius:6px; object-fit:cover; border:1px solid var(--border-glass); background:#000; transition:transform 0.2s,box-shadow 0.2s; }
+.img-mini-wow:hover { transform:scale(3); z-index:10; box-shadow:0 4px 15px rgba(0,0,0,0.5); position:relative; }
 </style>
 
 <div id="modalArtDetail" class="modal-over" onclick="if(event.target===this)closeArtDetail()">
@@ -335,6 +347,7 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
             <select id="fTipo"      class="select-wow" onchange="loadGeneral()"><option value="">Tipo...</option><option value="imagen">Imágenes</option><option value="video">Vídeos</option></select>
             <select id="fSocial"    class="select-wow" onchange="loadGeneral()"><option value="">Publicado en...</option><option value="ig">Instagram</option><option value="li">LinkedIn</option><option value="pi">Pinterest</option></select>
             <select id="fMarca"     class="select-wow" onchange="loadGeneral()"><option value="">Marca...</option><option value="NOXERTEZ">Noxertez</option><option value="CANDLEHOLDER">Candle Holder</option><option value="ZEN">Zen Garden</option></select>
+            <select id="fVinculado" class="select-wow" onchange="loadGeneral()"><option value="">Vínculo...</option><option value="con">Con Artículo</option><option value="sin">Sin Artículo</option></select>
             <select id="fEstancia"  class="select-wow" onchange="loadGeneral()"><option value="">Estancia...</option><?php foreach($estancias_rows as $e) echo "<option value=\"$e\">$e</option>"; ?></select>
             <select id="fEstilo"    class="select-wow" onchange="loadGeneral()"><option value="">Estilo...</option><?php foreach($estilos_rows as $e) echo "<option value=\"$e\">$e</option>"; ?></select>
             <select id="fDecoracion"class="select-wow" onchange="loadGeneral()"><option value="">Decoración...</option><?php foreach($decos_rows as $d) echo "<option value=\"$d\">$d</option>"; ?></select>
@@ -342,6 +355,8 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
             <div id="genCount" style="color:var(--accent-gold); font-size: 0.85rem; margin-left: 15px;">...</div>
             <button class="btn" onclick="loadGeneral()" style="flex:none; width:auto; padding:8px 15px;"><i class="fas fa-sync" id="genSyncIcon"></i> Refrescar</button>
             <button class="btn" onclick="refreshFilters()" style="flex:none; width:auto; padding:8px 15px;"><i class="fas fa-broom"></i> Limpiar Filtros</button>
+            <button id="btnBatchDownload" class="btn btn-green" onclick="downloadSelected()" style="flex:none; width:auto; padding:8px 15px; display:none;"><i class="fas fa-download"></i> Descargar (<span id="selCount">0</span>)</button>
+            <button id="btnBatchDelete" class="btn btn-red" onclick="deleteSelected()" style="flex:none; width:auto; padding:8px 15px; display:none; background:#e74c3c;"><i class="fas fa-trash"></i> Eliminar</button>
             <button class="btn btn-gold" onclick="document.getElementById('folderInput').click()" style="flex:none;padding:9px 18px;"><i class="fas fa-upload"></i> Subir</button>
             <input type="file" id="folderInput" webkitdirectory directory multiple style="display:none;" onchange="handleFolderUpload()">
         </div>
@@ -351,21 +366,45 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
 
     <!-- ========== PESTAÑA ESTADÍSTICAS ========== -->
     <div id="tab-stats" class="tab-content">
+        <h2 style="font-family:'UnifrakturCook',cursive; color:var(--accent-gold); margin-bottom:25px; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-chart-pie"></i> Panel de Rendimiento</span>
+            <button class="btn" onclick="statsLoaded=false; loadStats();" style="width:auto; padding:8px 15px; font-size:0.8rem;">
+                <i class="fas fa-sync"></i> Actualizar Datos
+            </button>
+        </h2>
+
+        <div id="statsInitial" style="text-align:center; padding:100px 40px; background:rgba(255,255,255,0.02); border:1px dashed var(--border-glass); border-radius:14px;">
+            <i class="fas fa-chart-bar" style="font-size:3rem; color:var(--accent-gold); opacity:0.3; margin-bottom:20px; display:block;"></i>
+            <p style="color:#888; font-size:1.1rem;">Haz clic en <b>Actualizar Datos</b> para calcular el rendimiento del catálogo.</p>
+        </div>
+
         <div id="statsLoading" style="text-align:center;padding:60px;display:none;"><i class="fas fa-circle-notch fa-spin" style="font-size:2rem;color:var(--accent-gold);"></i><p style="margin-top:14px;color:#888;">Calculando estadísticas...</p></div>
         <div id="statsContent" style="display:none;">
-            <h2 style="font-family:'UnifrakturCook',cursive; color:var(--accent-gold); margin-bottom:25px; display:flex; justify-content:space-between; align-items:center;">
-                <span><i class="fas fa-chart-pie"></i> Panel de Rendimiento</span>
-                <button class="btn" onclick="statsLoaded=false; loadStats();" style="width:auto; padding:8px 15px; font-size:0.8rem;">
-                    <i class="fas fa-sync"></i> Actualizar Datos
-                </button>
-            </h2>
-
             <!-- KPIs -->
             <div class="stats-grid-kpi" id="kpiGrid"></div>
 
+            <!-- Artículos Base (Ahora lo segundo que se ve) -->
+            <div class="stats-section">
+                <div class="stats-header">
+                    <h3><i class="fas fa-boxes"></i> Cobertura de Artículos Base (Agrupados)</h3>
+                    <div class="sort-controls">
+                        <button class="btn-mini active" id="sortBaseDesc" onclick="sortStats('base', 'desc')"><i class="fas fa-sort-amount-down"></i> May-Men</button>
+                        <button class="btn-mini" id="sortBaseAsc" onclick="sortStats('base', 'asc')"><i class="fas fa-sort-amount-up"></i> Men-May</button>
+                    </div>
+                </div>
+                <p style="font-size:0.8rem; color:#94a3b8; margin-bottom:20px;">Esta sección agrupa todas las variantes (P01, P02...) bajo su artículo principal para medir el alcance real del catálogo.</p>
+                <div id="baseRanking"></div>
+            </div>
+
             <!-- Cobertura de categorías -->
             <div class="stats-section">
-                <h3><i class="fas fa-layer-group"></i> Cobertura por Categoría</h3>
+                <div class="stats-header">
+                    <h3><i class="fas fa-layer-group"></i> Cobertura por Categoría</h3>
+                    <div class="sort-controls">
+                        <button class="btn-mini active" id="sortCatDesc" onclick="sortStats('cat', 'desc')"><i class="fas fa-sort-amount-down"></i> May-Men</button>
+                        <button class="btn-mini" id="sortCatAsc" onclick="sortStats('cat', 'asc')"><i class="fas fa-sort-amount-up"></i> Men-May</button>
+                    </div>
+                </div>
                 <div id="catCoverage"></div>
             </div>
 
@@ -374,7 +413,13 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
 
                 <!-- Ranking TOP artículos con más mockups -->
                 <div class="stats-section">
-                    <h3><i class="fas fa-trophy"></i> Top Artículos con Más Mockups</h3>
+                    <div class="stats-header">
+                        <h3><i class="fas fa-trophy"></i> Top Artículos</h3>
+                        <div class="sort-controls">
+                            <button class="btn-mini active" id="sortRankDesc" onclick="sortStats('rank', 'desc')"><i class="fas fa-sort-amount-down"></i> May-Men</button>
+                            <button class="btn-mini" id="sortRankAsc" onclick="sortStats('rank', 'asc')"><i class="fas fa-sort-amount-up"></i> Men-May</button>
+                        </div>
+                    </div>
                     <div id="rankingTop"></div>
                 </div>
 
@@ -385,7 +430,13 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
                         <div id="qualStats"></div>
                     </div>
                     <div class="stats-section">
-                        <h3><i class="fas fa-home"></i> Top Estancias</h3>
+                        <div class="stats-header">
+                            <h3><i class="fas fa-home"></i> Top Estancias</h3>
+                            <div class="sort-controls">
+                                <button class="btn-mini active" id="sortEstDesc" onclick="sortStats('est', 'desc')"><i class="fas fa-sort-amount-down"></i> May-Men</button>
+                                <button class="btn-mini" id="sortEstAsc" onclick="sortStats('est', 'asc')"><i class="fas fa-sort-amount-up"></i> Men-May</button>
+                            </div>
+                        </div>
                         <div id="estanciaStats"></div>
                     </div>
                 </div>
@@ -406,6 +457,27 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
 
 <script>
 let artFilter = 'with', currentVinMockupId = null, currentVinSkus = [];
+const BASE_PATH = '../';
+
+function resolverRuta(foto) {
+    if (!foto) return BASE_PATH + 'img/logo.png';
+    const clean = foto.replace(/\\/g, '/');
+    if (/^[a-zA-Z]:\//.test(clean)) {
+        const idx = clean.toLowerCase().indexOf('uploads/');
+        if (idx !== -1) return BASE_PATH + clean.substring(idx);
+        const idxImg = clean.toLowerCase().indexOf('/imagenes/');
+        if (idxImg !== -1) return BASE_PATH + 'uploads/articulos' + clean.substring(idxImg);
+        return BASE_PATH + 'uploads/articulos/imagenes/' + clean.split('/').pop();
+    }
+    if (clean.startsWith('uploads/')) return BASE_PATH + clean;
+    return BASE_PATH + 'uploads/' + clean;
+}
+
+function escH(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function switchTab(id, btn) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -414,7 +486,6 @@ function switchTab(id, btn) {
     if(id === 'tab-gen' && document.getElementById('gridGen').children.length === 0) {
         document.getElementById('gridGen').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:100px;color:#666;"><h3>Banco Vacío</h3><p>Usa los filtros para buscar mockups.</p></div>';
     }
-    if(id === 'tab-stats') loadStats();
 }
 
 async function loadArticles() {
@@ -435,8 +506,10 @@ function renderArticles(list) {
         shown++;
         const thumbs = mocks.map(m => `<div class="thumb-wrap"><img src="../${m.tipo==='video'?'img/video_placeholder.jpg':m.ruta}" class="thumb" onclick="openLB('../${m.ruta}','${m.tipo}')">${m.tipo==='video'?'<i class="fas fa-play" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;pointer-events:none;font-size:0.8rem;"></i>':''}${m.manual?`<i class="fas fa-times thumb-del" onclick="event.stopPropagation();unlinkDirect('${art.referencia}',${m.id})"></i>`:''}</div>`).join('');
         const card = document.createElement('div'); card.className = 'mockup-card article-card'; card.dataset.sku = art.referencia.toLowerCase(); card.dataset.nom = art.nombre.toLowerCase();
+        const nameEsc = art.nombre.replace(/"/g, '&quot;').replace(/'/g, "\\'");
         const mocksJson = JSON.stringify(mocks).replace(/'/g, "&#39;");
-        card.innerHTML = `<div class="card-img" onclick='openArtDetail("${art.referencia}","${art.nombre}","${art.foto_portada}",${mocksJson})'><img src="../${art.foto_portada}" onerror="this.src='../img/placeholder_product.png'"><div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);padding:5px 10px;border-radius:20px;font-size:0.7rem;color:var(--accent-gold);border:1px solid var(--accent-gold);"><i class="fas fa-images"></i> ${mocks.length}</div></div><div class="card-body"><div class="card-title">${art.nombre}</div><div class="card-sub">SKU: ${art.referencia}</div><div class="thumbs">${thumbs}</div><div class="card-actions"><button class="btn" onclick='openArtDetail("${art.referencia}","${art.nombre}","${art.foto_portada}",${mocksJson})'><i class="fas fa-eye"></i> Detalle</button>${hasMock?`<button class="btn btn-green" style="flex:2" onclick="downloadAll(${JSON.stringify(mocks.map(m=>m.ruta))})"><i class="fas fa-download"></i> Descargar</button>`:`<button class="btn btn-gold" style="flex:2" onclick="goToLink('${art.referencia}')"><i class="fas fa-search-plus"></i> Banco</button>`}</div></div>`;
+        const artImg = resolverRuta(art.foto_portada);
+        card.innerHTML = `<div class="card-img" onclick='openArtDetail("${art.referencia}","${nameEsc}","${art.foto_portada}",${mocksJson})'><img src="${artImg}" onerror="this.src='../img/placeholder_product.png'"><div style="position:absolute;top:10px;right:10px;background:rgba(0,0,0,0.6);padding:5px 10px;border-radius:20px;font-size:0.7rem;color:var(--accent-gold);border:1px solid var(--accent-gold);"><i class="fas fa-images"></i> ${mocks.length}</div></div><div class="card-body"><div class="card-title">${art.nombre}</div><div class="card-sub">SKU: ${art.referencia}</div><div class="thumbs">${thumbs}</div><div class="card-actions"><button class="btn" onclick='openArtDetail("${art.referencia}","${nameEsc}","${art.foto_portada}",${mocksJson})'><i class="fas fa-eye"></i> Detalle</button>${hasMock?`<button class="btn btn-green" style="flex:2" onclick="downloadAll(${JSON.stringify(mocks.map(m=>m.ruta))})"><i class="fas fa-download"></i> Descargar</button>`:`<button class="btn btn-gold" style="flex:2" onclick="goToLink('${art.referencia}')"><i class="fas fa-search-plus"></i> Banco</button>`}</div></div>`;
         grid.appendChild(card);
     });
     document.getElementById('artCount').innerText = `Mostrando: ${shown} artículos.`;
@@ -463,11 +536,11 @@ async function refreshFilters() {
 }
 
 async function loadGeneral() {
-    const q = document.getElementById('fBuscar').value, t = document.getElementById('fTipo').value, ma = document.getElementById('fMarca').value, est = document.getElementById('fEstancia').value, esti = document.getElementById('fEstilo').value, dec = document.getElementById('fDecoracion').value, soc = document.getElementById('fSocial').value;
-    if(!q && !t && !ma && !est && !esti && !dec && !soc) { alert('Selecciona un filtro o busca algo.'); return; }
+    const q = document.getElementById('fBuscar').value, t = document.getElementById('fTipo').value, ma = document.getElementById('fMarca').value, est = document.getElementById('fEstancia').value, esti = document.getElementById('fEstilo').value, dec = document.getElementById('fDecoracion').value, soc = document.getElementById('fSocial').value, vin = document.getElementById('fVinculado').value;
+    if(!q && !t && !ma && !est && !esti && !dec && !soc && !vin) { alert('Selecciona un filtro o busca algo.'); return; }
     const ic = document.getElementById('genSyncIcon'); if(ic) ic.classList.add('fa-spin');
     document.getElementById('genLoading').style.display = 'block';
-    const p = new URLSearchParams({ accion: 'listar', tipo: t, marca: ma, estancia: est, estilo: esti, decoracion: dec, social: soc, buscar: q });
+    const p = new URLSearchParams({ accion: 'listar', tipo: t, marca: ma, estancia: est, estilo: esti, decoracion: dec, social: soc, vinculado: vin, buscar: q });
     try {
         const r = await fetch(`../api/mockups_varios.php?${p}`); const mocks = await r.json();
         document.getElementById('genCount').innerText = `Encontrados: ${mocks.length} mockups.`;
@@ -476,10 +549,13 @@ async function loadGeneral() {
             const card = document.createElement('div'); card.className = 'mockup-card';
             const skus = m.skus ? m.skus.split(',') : []; const hasLinks = skus.length > 0;
             const linksHtml = skus.map(s => `<span style="background:rgba(212,175,55,0.1); padding:2px 5px; border-radius:4px; font-size:0.7rem; color:var(--accent-gold); border:1px solid rgba(212,175,55,0.2);">${s}</span>`).join(' ');
-            const socialIcons = `<div class="social-icons">
-                <i class="fab fa-instagram ${m.publicado_instagram?'active':''}"></i>
-                <i class="fab fa-pinterest ${m.publicado_pinterest?'active':''}"></i>
-                <i class="fab fa-linkedin ${m.publicado_linkedin?'active':''}"></i>
+            const socialIcons = `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                <div class="social-icons" style="margin-top:0;">
+                    <i class="fab fa-instagram ${m.publicado_instagram?'active':''}"></i>
+                    <i class="fab fa-pinterest ${m.publicado_pinterest?'active':''}"></i>
+                    <i class="fab fa-linkedin ${m.publicado_linkedin?'active':''}"></i>
+                </div>
+                <input type="checkbox" class="mock-check" value="${m.id}" data-path="${m.ruta}" onchange="updateBatchUI()" style="width:16px; height:16px; cursor:pointer; accent-color:var(--accent-gold); margin:0;">
             </div>`;
             const stats = `<div class="usage-stats"><span><i class="fas fa-history"></i> ${m.ultima_vez_usado || 'Nunca'}</span><span><i class="fas fa-chart-line"></i> ${m.veces_usado} usos</span></div>`;
             card.innerHTML = `<div class="card-img" onclick="openLB('../${m.ruta}','${m.tipo}')">${m.tipo==='video'?`<video src="../${m.ruta}"></video><i class="fas fa-play" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:rgba(255,255,255,0.6);font-size:1.5rem;"></i>`:`<img src="../${m.ruta}" loading="lazy">`}<span class="quality-badge q-${m.calidad}">${m.calidad}</span></div><div class="card-body"><div class="card-title">${m.archivo}</div><div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:10px; min-height:20px;">${linksHtml}</div>${socialIcons}${stats}<div class="card-actions" style="margin-top:12px;"><button class="btn" onclick="openLB('../${m.ruta}','${m.tipo}')"><i class="fas fa-expand"></i></button><button class="btn" onclick="openEdit(${m.id})"><i class="fas fa-cog"></i></button><button class="btn ${hasLinks?'btn-green':'btn-gold'}" style="flex:2" onclick="openVinculos(${m.id},'${m.ruta}','${m.tipo}','${m.skus||''}')"><i class="fas ${hasLinks?'fa-check-circle':'fa-link'}"></i> ${hasLinks?'Vinculado':'Vincular'}</button></div></div>`;
@@ -541,7 +617,7 @@ function goToArticle(sku) {
 }
 async function openVinculos(id, ruta, tipo, skusStr) { currentVinMockupId = id; currentVinSkus = skusStr ? skusStr.split(',') : []; document.getElementById('vinPreview').innerHTML = tipo==='video'?`<video src="../${ruta}" autoplay muted loop style="width:100%;height:100%;object-fit:cover"></video>`:`<img src="../${ruta}" style="width:100%;height:100%;object-fit:cover">`; document.getElementById('vGrid').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:40px;">Selecciona una categoría...</div>'; document.getElementById('modalVinculos').style.display = 'flex'; renderVinActuales(); }
 function renderVinActuales() { const cont = document.getElementById('vinActuales'); cont.innerHTML = currentVinSkus.length ? '' : '...'; currentVinSkus.forEach(sku => { const tag = document.createElement('div'); tag.style = 'background:rgba(212,175,55,0.15); border:1px solid var(--accent-gold); padding:8px 15px; border-radius:20px; font-size:0.85rem; display:flex; align-items:center; gap:10px;'; tag.innerHTML = `<span><b>${sku}</b></span><i class="fas fa-times-circle" style="cursor:pointer;color:#e74c3c;" onclick="toggleVinculo('${sku}')"></i>`; cont.appendChild(tag); }); }
-async function loadVinCatalog() { const cat = document.getElementById('vCat').value, q = document.getElementById('vSearch').value.toLowerCase(); if(!cat && q.length < 3) return; const r = await fetch(`${window.location.pathname}?action=get_articles&categoria=${encodeURIComponent(cat)}&solo_base=true`); const d = await r.json(), grid = document.getElementById('vGrid'); grid.innerHTML = ''; (d.articulos || []).filter(a => a.nombre.toLowerCase().includes(q) || a.referencia.toLowerCase().includes(q)).forEach(a => { const isSel = currentVinSkus.includes(a.referencia), item = document.createElement('div'); item.className = 'art-item' + (isSel ? ' selected' : ''); item.onclick = () => toggleVinculo(a.referencia); item.innerHTML = `<div style="height:100px; background:#000;"><img src="../${a.foto_portada}" style="width:100%;height:100%;object-fit:cover;"></div><div style="padding:8px; font-size:0.75rem;"><div style="color:var(--accent-gold);">${a.nombre}</div><div>${a.referencia}</div></div>`; grid.appendChild(item); }); }
+async function loadVinCatalog() { const cat = document.getElementById('vCat').value, q = document.getElementById('vSearch').value.toLowerCase(); if(!cat && q.length < 3) return; const r = await fetch(`${window.location.pathname}?action=get_articles&categoria=${encodeURIComponent(cat)}&solo_base=true`); const d = await r.json(), grid = document.getElementById('vGrid'); grid.innerHTML = ''; (d.articulos || []).filter(a => a.nombre.toLowerCase().includes(q) || a.referencia.toLowerCase().includes(q)).forEach(a => { const isSel = currentVinSkus.includes(a.referencia), item = document.createElement('div'); item.className = 'art-item' + (isSel ? ' selected' : ''); item.onclick = () => toggleVinculo(a.referencia); item.innerHTML = `<div style="height:100px; background:#000;"><img src="${resolverRuta(a.foto_portada)}" style="width:100%;height:100%;object-fit:cover;"></div><div style="padding:8px; font-size:0.75rem;"><div style="color:var(--accent-gold);">${a.nombre}</div><div>${a.referencia}</div></div>`; grid.appendChild(item); }); }
 async function toggleVinculo(sku) { const isLinked = currentVinSkus.includes(sku), action = isLinked ? 'desvincular_multiple' : 'vincular_multiple'; if (isLinked) currentVinSkus = currentVinSkus.filter(s => s !== sku); else currentVinSkus.push(sku); renderVinActuales(); loadVinCatalog(); const fd = new FormData(); fd.append('accion', action); fd.append('id', currentVinMockupId); fd.append('sku', sku); await fetch('../api/mockups_varios.php', {method:'POST', body:fd}); }
 function closeVinculos() { document.getElementById('modalVinculos').style.display = 'none'; loadGeneral(); loadArticles(); }
 function deleteMockup() { if(confirm('¿Eliminar?')) { const fd = new FormData(); fd.append('accion','eliminar'); fd.append('id', document.getElementById('editId').value); fetch('../api/mockups_varios.php', {method:'POST',body:fd}).then(()=> { closeModal(); loadGeneral(); }); } }
@@ -550,14 +626,25 @@ function openArtDetail(sku, name, photo, mocks) {
     document.getElementById('artDetailTitle').innerText = 'Galería: ' + name;
     document.getElementById('artDetailName').innerText = name;
     document.getElementById('artDetailSku').innerText = 'SKU: ' + sku;
-    document.getElementById('artDetailImg').innerHTML = `<img src="../${photo}" style="width:100%;height:100%;object-fit:cover;">`;
+    document.getElementById('artDetailImg').innerHTML = `<img src="${resolverRuta(photo)}" style="width:100%;height:100%;object-fit:cover;">`;
     const grid = document.getElementById('artDetailMocks'); grid.innerHTML = '';
     if (!mocks || !mocks.length) {
         grid.innerHTML = '<p style="color:#94a3b8;padding:20px;">Este artículo no tiene mockups asociados todavía.</p>';
     } else {
         mocks.forEach(m => {
-            const card = document.createElement('div'); card.className = 'detail-mock-card';
-            card.innerHTML = `<div style="position:relative;"><img src="../${m.tipo==='video'?'img/video_placeholder.jpg':m.ruta}" class="detail-mock-img" onclick="openLB('../${m.ruta}','${m.tipo}')">${m.tipo==='video'?'<i class="fas fa-play" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;pointer-events:none;font-size:1.5rem;opacity:0.8;"></i>':''}</div><div style="padding:10px; display:flex; justify-content:space-between; align-items:center;"><span style="font-size:0.7rem; color:#94a3b8;">${m.tipo.toUpperCase()}</span><button class="btn btn-gold" style="width:auto; padding:5px 10px; font-size:0.8rem;" onclick="downloadAll(['${m.ruta}'])"><i class="fas fa-download"></i></button></div>`;
+            const card = document.createElement('div'); 
+            card.className = 'detail-mock-card';
+            card.innerHTML = `
+                <div style="position:relative;">
+                    <img src="../${m.tipo==='video'?'img/video_placeholder.jpg':m.ruta}" class="detail-mock-img" onclick="openLB('../${m.ruta}','${m.tipo}')">
+                    ${m.tipo==='video'?'<i class="fas fa-play" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;pointer-events:none;font-size:1.5rem;opacity:0.8;"></i>':''}
+                </div>
+                <div class="detail-mock-info">
+                    <span style="font-size:0.75rem; color:#94a3b8; font-weight:700; text-transform:uppercase;">${m.tipo}</span>
+                    <button class="btn btn-gold" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="downloadAll(['${m.ruta}'])">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>`;
             grid.appendChild(card);
         });
     }
@@ -572,41 +659,134 @@ function filterArt() { const q = document.getElementById('searchArt').value.toLo
 function setArtFilter(f, btn) { artFilter = f; document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); loadArticles(); }
 document.addEventListener('DOMContentLoaded', () => { loadArticles(); });
 
+function updateBatchUI() {
+    const checks = document.querySelectorAll('.mock-check:checked');
+    const btnDown = document.getElementById('btnBatchDownload');
+    const btnDel = document.getElementById('btnBatchDelete');
+    const count = document.getElementById('selCount');
+    if (checks.length > 0) {
+        btnDown.style.display = 'flex';
+        btnDel.style.display = 'flex';
+        count.innerText = checks.length;
+    } else {
+        btnDown.style.display = 'none';
+        btnDel.style.display = 'none';
+    }
+}
+
+function downloadSelected() {
+    const checks = document.querySelectorAll('.mock-check:checked');
+    if (!checks.length) return;
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '../api/mockups_varios.php';
+    form.style.display = 'none';
+
+    const accion = document.createElement('input');
+    accion.name = 'accion';
+    accion.value = 'download_zip';
+    form.appendChild(accion);
+
+    checks.forEach(c => {
+        const input = document.createElement('input');
+        input.name = 'files[]';
+        input.value = c.dataset.path;
+        form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
+    setTimeout(() => {
+        checks.forEach(c => c.checked = false);
+        updateBatchUI();
+    }, 1000);
+}
+
+async function deleteSelected() {
+    const checks = document.querySelectorAll('.mock-check:checked');
+    if (!checks.length) return;
+    if (!confirm(`¿Eliminar definitivamente los ${checks.length} mockups seleccionados? Esta acción no se puede deshacer.`)) return;
+    
+    const fd = new FormData();
+    fd.append('accion', 'delete_batch');
+    checks.forEach(c => fd.append('ids[]', c.value));
+
+    try {
+        const r = await fetch('../api/mockups_varios.php', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.status === 'ok') {
+            loadGeneral();
+            updateBatchUI();
+        }
+    } catch(e) { alert('Error al eliminar'); }
+}
+
 // ===== ESTADÍSTICAS =====
-let statsLoaded = false;
+let statsLoaded = false, statsData = null;
 async function loadStats() {
-    if (statsLoaded) return; // cache: solo carga una vez por sesión
+    if (statsLoaded) return;
+    const initial = document.getElementById('statsInitial');
+    if(initial) initial.style.display = 'none';
     document.getElementById('statsLoading').style.display = 'block';
     document.getElementById('statsContent').style.display = 'none';
     try {
         const r = await fetch('../api/mockups_varios.php?accion=estadisticas');
-        const d = await r.json();
-        renderKPIs(d.totales);
-        renderCatCoverage(d.por_categoria);
-        renderRankingTop(d.ranking);
-        renderQuality(d.por_calidad, d.totales.mockups);
-        renderEstancias(d.por_estancia);
-        renderSinMockup(d.sin_mockup);
+        statsData = await r.json();
+        renderKPIs(statsData.totales);
+        renderCatCoverage(statsData.por_categoria);
+        renderRankingTop(statsData.ranking);
+        renderQuality(statsData.por_calidad, statsData.totales.mockups);
+        renderEstancias(statsData.por_estancia);
+        renderSinMockup(statsData.sin_mockup);
+        renderBaseRanking(statsData.articulos_base, 'desc');
         statsLoaded = true;
         document.getElementById('statsLoading').style.display = 'none';
         document.getElementById('statsContent').style.display = 'block';
-        // Trigger animations after visible
         setTimeout(() => animateBars(), 80);
     } catch(e) {
         document.getElementById('statsLoading').innerHTML = '<p style="color:#e74c3c;"><i class="fas fa-exclamation-triangle"></i> Error cargando estadísticas.</p>';
     }
 }
 
+function sortStats(type, order) {
+    if (!statsData) return;
+    const group = type==='cat' ? 'Cat' : (type==='rank' ? 'Rank' : (type==='est' ? 'Est' : 'Base'));
+    document.getElementById(`sort${group}Desc`).classList.toggle('active', order==='desc');
+    document.getElementById(`sort${group}Asc`).classList.toggle('active', order==='asc');
+
+    if (type === 'cat') {
+        statsData.por_categoria.sort((a, b) => {
+            const pctA = a.total_arts > 0 ? (a.arts_con_mockup / a.total_arts) : 0;
+            const pctB = b.total_arts > 0 ? (b.arts_con_mockup / b.total_arts) : 0;
+            return order === 'desc' ? pctB - pctA : pctA - pctB;
+        });
+        renderCatCoverage(statsData.por_categoria);
+    } else if (type === 'rank') {
+        statsData.ranking.sort((a, b) => (order === 'desc' ? b.total_mockups - a.total_mockups : a.total_mockups - b.total_mockups));
+        renderRankingTop(statsData.ranking, order);
+    } else if (type === 'est') {
+        statsData.por_estancia.sort((a, b) => (order === 'desc' ? b.total - a.total : a.total - b.total));
+        renderEstancias(statsData.por_estancia, order);
+    } else if (type === 'base') {
+        statsData.articulos_base.sort((a, b) => (order === 'desc' ? b.total_mockups - a.total_mockups : a.total_mockups - b.total_mockups));
+        renderBaseRanking(statsData.articulos_base, order);
+    }
+    animateBars();
+}
+
 function renderKPIs(t) {
     const pct = t.articulos > 0 ? Math.round((t.con_mockup / t.articulos) * 100) : 0;
+    const pctBase = t.total_base > 0 ? Math.round((t.con_mockup_base / t.total_base) * 100) : 0;
     const kpis = [
         { icon: 'fa-images',          num: t.mockups,    label: 'Total Mockups',       cls: '' },
+        { icon: 'fa-box',             num: t.total_base, label: 'Artículos Base',      cls: '' },
+        { icon: 'fa-percentage',      num: pctBase + '%', label: 'Cobertura Base',     cls: pctBase >= 80 ? 'success' : pctBase >= 50 ? '' : 'danger' },
+        { icon: 'fa-check-circle',    num: t.con_mockup_base, label: 'Bases con Mockup',  cls: 'success' },
         { icon: 'fa-photo-video',     num: t.imagenes,   label: 'Imágenes',            cls: 'info' },
         { icon: 'fa-film',            num: t.videos,     label: 'Vídeos',              cls: 'info' },
-        { icon: 'fa-box',             num: t.articulos,  label: 'Artículos Base',      cls: '' },
-        { icon: 'fa-check-circle',    num: t.con_mockup, label: 'Con Mockup',          cls: 'success' },
-        { icon: 'fa-exclamation-circle', num: t.sin_mockup, label: 'Sin Mockup',       cls: 'danger' },
-        { icon: 'fa-percentage',      num: pct + '%',    label: 'Cobertura Total',     cls: pct >= 80 ? 'success' : pct >= 50 ? '' : 'danger' },
     ];
     document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
         <div class="kpi-card ${k.cls}">
@@ -621,10 +801,9 @@ function renderCatCoverage(cats) {
     if (!cats || !cats.length) { el.innerHTML = '<p style="color:#666;">Sin datos.</p>'; return; }
     el.innerHTML = cats.map(c => {
         const pct = c.total_arts > 0 ? Math.round((c.arts_con_mockup / c.total_arts) * 100) : 0;
-        const pctStr = pct + '%';
         const color = pct >= 80 ? '#27ae60' : pct >= 40 ? '#d4af37' : '#e74c3c';
         return `<div class="coverage-ring-wrap">
-            <div class="ring" style="--pct:${pctStr}; background:conic-gradient(${color} 0% ${pctStr}, rgba(255,255,255,0.07) ${pctStr} 100%);">
+            <div class="ring" style="--pct:${pct}%; background:conic-gradient(${color} 0% ${pct}%, rgba(255,255,255,0.07) ${pct}% 100%);">
                 <span class="ring-pct">${pct}%</span>
             </div>
             <div class="ring-info">
@@ -638,7 +817,7 @@ function renderCatCoverage(cats) {
     }).join('');
 }
 
-function renderRankingTop(ranking) {
+function renderRankingTop(ranking, order = 'desc') {
     const el = document.getElementById('rankingTop');
     if (!ranking || !ranking.length) { el.innerHTML = '<p style="color:#666;">Sin datos.</p>'; return; }
     const max = Math.max(...ranking.map(r => parseInt(r.total_mockups)));
@@ -646,7 +825,7 @@ function renderRankingTop(ranking) {
         const n = parseInt(r.total_mockups);
         const pct = max > 0 ? (n / max * 100) : 0;
         const cls = n >= 5 ? 'rich' : n >= 2 ? 'medium' : n === 0 ? 'zero' : 'low';
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="color:#555;font-size:.75rem;">${i+1}.</span>`;
+        const medal = (order === 'desc' && i < 3) ? (i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉') : `<span style="color:#555;font-size:.75rem;">${i+1}.</span>`;
         return `<div class="bar-row">
             <div class="bar-label" title="${r.nombre}" onclick="goToArticle('${r.referencia}')">${medal} ${r.nombre}<span class="sku-tag">${r.referencia}</span></div>
             <div class="bar-track"><div class="bar-fill ${cls}" data-w="${pct.toFixed(1)}" style="width:0%"></div></div>
@@ -667,11 +846,11 @@ function renderQuality(quals, total) {
     el.innerHTML = `<div class="qual-pills">${pills}</div><div class="stacked-bar">${segs}</div>`;
 }
 
-function renderEstancias(estancias) {
+function renderEstancias(estancias, order = 'desc') {
     const el = document.getElementById('estanciaStats');
     if (!estancias || !estancias.length) { el.innerHTML = '<p style="color:#666;">Sin datos.</p>'; return; }
     const max = Math.max(...estancias.map(e => parseInt(e.total)));
-    el.innerHTML = estancias.map(e => {
+    el.innerHTML = estancias.slice(0, 15).map(e => {
         const pct = max > 0 ? (parseInt(e.total) / max * 100).toFixed(1) : 0;
         return `<div class="bar-row">
             <div class="bar-label" title="${e.estancia}">${e.estancia}</div>
@@ -681,16 +860,38 @@ function renderEstancias(estancias) {
     }).join('');
 }
 
+function renderBaseRanking(ranking, order = 'desc') {
+    const el = document.getElementById('baseRanking');
+    if (!ranking || !ranking.length) { el.innerHTML = '<p style="color:#666;">Sin datos.</p>'; return; }
+    const max = Math.max(...ranking.map(r => parseInt(r.total_mockups)));
+    el.innerHTML = ranking.slice(0, 30).map((r, i) => {
+        const n = parseInt(r.total_mockups);
+        const pct = max > 0 ? (n / max * 100) : 0;
+        const cls = n > 0 ? 'rich' : 'zero';
+        const medal = (order === 'desc' && i < 3) ? (i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉') : `<span style="color:#555;font-size:.75rem;">${i+1}.</span>`;
+        return `<div class="bar-row">
+            <div class="bar-label" onclick="goToArticle('${r.base_sku}')" style="display:flex;align-items:center;gap:10px;flex:0 0 280px;">
+                ${medal}
+                <img src="${resolverRuta(r.foto)}" class="img-mini-wow" onerror="this.src='../img/logo.png'">
+                <div>
+                    <b>${r.base_sku}</b>
+                    <span class="sku-tag">${r.total_variantes} variantes</span>
+                </div>
+            </div>
+            <div class="bar-track"><div class="bar-fill ${cls}" data-w="${pct.toFixed(1)}" style="width:0%"></div></div>
+            <div class="bar-val ${n===0?'zero':''}">${n}</div>
+        </div>`;
+    }).join('');
+}
+
 function renderSinMockup(arts) {
     const el = document.getElementById('sinMockupGrid');
     const sec = document.getElementById('sinMockupSec');
-    if (!arts || !arts.length) {
-        sec.style.display = 'none'; return;
-    }
+    if (!arts || !arts.length) { sec.style.display = 'none'; return; }
     sec.querySelector('h3').innerHTML = `<i class="fas fa-exclamation-triangle" style="color:#e74c3c;"></i> Artículos Sin Mockups — Prioridad de Creación <span style="background:#e74c3c;color:#fff;border-radius:20px;padding:2px 10px;font-size:.75rem;margin-left:8px;">${arts.length}</span>`;
     el.innerHTML = arts.map(a => `
         <div class="alert-item" onclick="goToArticle('${a.referencia}')" title="Ir a buscar mockup para ${a.referencia}">
-            <img class="alert-thumb" src="../${a.foto_portada}" onerror="this.src='../img/placeholder_product.png'">
+            <img class="alert-thumb" src="${resolverRuta(a.foto_portada)}" onerror="this.src='../img/placeholder_product.png'">
             <div class="alert-info">
                 <div class="sku">${a.referencia}</div>
                 <div class="nom">${a.nombre}</div>
@@ -700,14 +901,8 @@ function renderSinMockup(arts) {
 }
 
 function animateBars() {
-    // Barras horizontales
-    document.querySelectorAll('.bar-fill[data-w]').forEach(el => {
-        el.style.width = el.dataset.w + '%';
-    });
-    // Segmentos apilados (calidad)
-    document.querySelectorAll('.stacked-seg[data-w]').forEach(el => {
-        el.style.width = el.dataset.w + '%';
-    });
+    document.querySelectorAll('.bar-fill[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    document.querySelectorAll('.stacked-seg[data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; });
 }
 </script>
 <?php require_once '../includes/footer.php'; ?>

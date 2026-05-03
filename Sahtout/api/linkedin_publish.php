@@ -260,6 +260,12 @@ switch ($accion) {
         // Recuperar contexto
         $estancia = ''; $decoracion = ''; $info_prod = '';
         
+        // Cargar configuración de tonos/enfoques por defecto
+        $stmtC = $db->query("SELECT clave, valor FROM configuracion WHERE clave IN ('linkedin_default_tono', 'linkedin_default_enfoque')");
+        $defaults = $stmtC->fetchAll(PDO::FETCH_KEY_PAIR);
+        $def_tono = $defaults['linkedin_default_tono'] ?? 'Cercano y Artesanal';
+        $def_enfoque = $defaults['linkedin_default_enfoque'] ?? 'storytelling';
+
         // 1. Info de producto
         if ($post['sku_ref']) {
             $stmtP = $db->prepare("SELECT NOMBRE, DESCRIPCION FROM productos WHERE SKU_REF = ?");
@@ -278,7 +284,7 @@ switch ($accion) {
             $m = $stmtM->fetch();
             if ($m) {
                 $estancia = $m['estancia'];
-                $decoracion = $m['estilo'] . " con luz " . $m['luz'];
+                $decoracion = ($m['estilo'] ?? 'artesanal') . " con luz " . ($m['luz'] ?? 'natural');
             }
         }
 
@@ -286,11 +292,12 @@ switch ($accion) {
             'estancia' => $estancia,
             'decoracion' => $decoracion,
             'info_prod' => $info_prod,
-            'tono' => 'Profesional'
+            'tono' => $def_tono,
+            'tipo' => $def_enfoque
         ]);
 
         // Llamar a Gemini / Groq
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . GEMINI_API_KEY;
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" . GEMINI_API_KEY;
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);

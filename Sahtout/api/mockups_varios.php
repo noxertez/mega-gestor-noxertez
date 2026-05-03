@@ -26,6 +26,13 @@ if ($accion === 'listar') {
     if (!empty($_GET['estancia'])) { $where[] = "estancia = ?"; $params[] = $_GET['estancia']; }
     if (!empty($_GET['estilo'])) { $where[] = "estilo = ?"; $params[] = $_GET['estilo']; }
     if (!empty($_GET['decoracion'])) { $where[] = "decoracion = ?"; $params[] = $_GET['decoracion']; }
+    if (!empty($_GET['vinculado'])) {
+        if ($_GET['vinculado'] === 'con') {
+            $where[] = "EXISTS (SELECT 1 FROM mockups_vinculaciones WHERE mockup_id = m.id)";
+        } else if ($_GET['vinculado'] === 'sin') {
+            $where[] = "NOT EXISTS (SELECT 1 FROM mockups_vinculaciones WHERE mockup_id = m.id)";
+        }
+    }
     if (!empty($_GET['buscar'])) { $where[] = "(archivo LIKE ? OR estancia LIKE ?)"; $params[] = "%".$_GET['buscar']."%"; $params[] = "%".$_GET['buscar']."%"; }
 
     $sql = "SELECT m.*, (SELECT GROUP_CONCAT(sku) FROM mockups_vinculaciones WHERE mockup_id = m.id) as skus 
@@ -90,7 +97,7 @@ if ($accion === 'estadisticas') {
     $totalImagenes  = $db->query("SELECT COUNT(*) FROM mockups_varios WHERE tipo='imagen'")->fetchColumn();
     $totalVideos    = $db->query("SELECT COUNT(*) FROM mockups_varios WHERE tipo='video'")->fetchColumn();
     $totalVinc      = $db->query("SELECT COUNT(DISTINCT sku) FROM mockups_vinculaciones")->fetchColumn();
-    $totalArticulos = $db->query("SELECT COUNT(*) FROM articulos WHERE es_variante='BASE' OR referencia REGEXP 'P01$'")->fetchColumn();
+    $totalArticulos = $db->query("SELECT COUNT(*) FROM articulos WHERE es_variante='BASE' OR referencia REGEXP '[Pp]01$'")->fetchColumn();
     $sinMockup      = (int)$totalArticulos - (int)$totalVinc;
 
     // 2. Ranking de artículos por número de mockups (top 30)
@@ -100,7 +107,7 @@ if ($accion === 'estadisticas') {
         FROM articulos a
         LEFT JOIN mockups_vinculaciones mv_v ON mv_v.sku = a.referencia
         LEFT JOIN mockups_varios mv ON mv.id = mv_v.mockup_id
-        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP 'P01$')
+        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP '[Pp]01$')
         GROUP BY a.referencia, a.nombre, a.foto_portada, a.categoria
         ORDER BY total_mockups DESC
         LIMIT 50
@@ -111,7 +118,7 @@ if ($accion === 'estadisticas') {
     $sinMockupStmt = $db->query("
         SELECT a.referencia, a.nombre, a.foto_portada, a.categoria
         FROM articulos a
-        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP 'P01$')
+        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP '[Pp]01$')
           AND a.referencia NOT IN (SELECT DISTINCT sku FROM mockups_vinculaciones)
         ORDER BY a.categoria, a.referencia
         LIMIT 40
@@ -127,7 +134,7 @@ if ($accion === 'estadisticas') {
         FROM articulos a
         LEFT JOIN mockups_vinculaciones mv_v ON mv_v.sku = a.referencia
         LEFT JOIN mockups_varios mv ON mv.id = mv_v.mockup_id
-        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP 'P01$')
+        WHERE (a.es_variante = 'BASE' OR a.referencia REGEXP '[Pp]01$')
           AND a.categoria != ''
         GROUP BY a.categoria
         ORDER BY total_mockups DESC
@@ -146,6 +153,26 @@ if ($accion === 'estadisticas') {
     ");
     $porEstancia = $estanciaStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // 7. Estadísticas por Artículo BASE (Utilizando tabla productos y ES_VARIANTE = 'BASE')
+    $baseStatsStmt = $db->query("
+        SELECT 
+            p_base.SKU_REF as base_sku,
+            p_base.FOTO_PORTADA as foto,
+            COUNT(DISTINCT p_all.SKU_REF) as total_variantes,
+            COUNT(DISTINCT mv.mockup_id) as total_mockups,
+            IF(COUNT(DISTINCT mv.mockup_id) > 0, 1, 0) as tiene_mockup
+        FROM productos p_base
+        LEFT JOIN productos p_all ON p_all.SKU_BASE = p_base.SKU_BASE
+        LEFT JOIN mockups_vinculaciones mv ON mv.sku = p_all.SKU_REF
+        WHERE (p_base.ES_VARIANTE = 'BASE' OR p_base.SKU_REF REGEXP '[Pp]01$')
+        GROUP BY p_base.SKU_REF
+    ");
+    $rawBase = $baseStatsStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $totalBase = count($rawBase);
+    $conMockupBase = 0;
+    foreach($rawBase as $rb) if($rb['tiene_mockup']) $conMockupBase++;
+
     echo json_encode([
         'totales'            => [
             'mockups'       => (int)$totalMockups,
@@ -154,13 +181,63 @@ if ($accion === 'estadisticas') {
             'articulos'     => (int)$totalArticulos,
             'con_mockup'    => (int)$totalVinc,
             'sin_mockup'    => max(0, $sinMockup),
+            'total_base'    => $totalBase,
+            'con_mockup_base' => $conMockupBase
         ],
         'ranking'            => $ranking,
         'sin_mockup'         => $articulosSinMockup,
         'por_categoria'      => $porCategoria,
         'por_calidad'        => $porCalidad,
         'por_estancia'       => $porEstancia,
+        'articulos_base'     => array_slice($rawBase, 0, 50) // Limitamos para el ranking
     ]);
+    exit;
+}
+
+if ($accion === 'delete_batch') {
+    $ids = $_POST['ids'] ?? [];
+    if (empty($ids)) die("No hay IDs seleccionados.");
+    
+    foreach ($ids as $id) {
+        $stmt = $db->prepare("SELECT ruta FROM mockups_varios WHERE id = ?");
+        $stmt->execute([$id]);
+        $ruta = $stmt->fetchColumn();
+        if ($ruta && file_exists('../' . $ruta)) unlink('../' . $ruta);
+        
+        $db->prepare("DELETE FROM mockups_varios WHERE id = ?")->execute([$id]);
+        $db->prepare("DELETE FROM mockups_vinculaciones WHERE mockup_id = ?")->execute([$id]);
+    }
+    echo json_encode(['status'=>'ok']);
+    exit;
+}
+
+if ($accion === 'download_zip') {
+    $files = $_POST['files'] ?? [];
+    if (empty($files)) die("No hay archivos seleccionados.");
+
+    $zip = new ZipArchive();
+    $zipName = 'noxertez_batch_' . date('Ymd_His') . '.zip';
+    $tmpFile = tempnam(sys_get_temp_dir(), 'zip');
+    
+    if ($zip->open($tmpFile, ZipArchive::CREATE) !== TRUE) {
+        die("Error al crear el archivo ZIP.");
+    }
+
+    foreach ($files as $f) {
+        $path = '../' . ltrim($f, '/');
+        if (file_exists($path)) {
+            $zip->addFile($path, basename($f));
+        }
+    }
+    $zip->close();
+
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $zipName . '"');
+    header('Content-Length: ' . filesize($tmpFile));
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    readfile($tmpFile);
+    unlink($tmpFile);
     exit;
 }
 

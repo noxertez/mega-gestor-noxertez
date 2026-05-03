@@ -6,36 +6,61 @@ function getNoxertezLinkedinPrompt($params) {
     $decoracion = $params['decoracion'] ?? 'artesanal';
     $info_prod = $params['info_prod'] ?? '';
     $contexto = $params['contexto'] ?? '';
-    $tono = $params['tono'] ?? 'cercano pero con criterio';
+    $tono = $params['tono'] ?? 'Cercano y Artesanal';
+    $tipo = $params['tipo'] ?? 'storytelling';
+
+    // Diccionario de instrucciones según el TIPO de publicación
+    $instrucciones_tipo = [
+        'storytelling' => "Foco: Narrativa de Marca. No intentes vender. Proyecta un estilo de vida, la filosofía 'slow made' y la sensibilidad estética de Noxertez. Habla del alma del taller.",
+        'lanzamiento' => "Foco: Artículo Nuevo / Lanzamiento. Anuncio elegante. Destaca la novedad, el diseño y por qué esta pieza era necesaria en el catálogo. Genera expectación.",
+        'interiorismo' => "Foco: Criterio de Interiorista. Da consejos sobre cómo integrar esta pieza en el espacio (luz, contrastes, texturas). Actúa como un experto en decoración.",
+        'detalles' => "Foco: Detalles de Autor. Zoom a un detalle técnico o estético (veta, ensamblaje, acabado) que hace única a la pieza. Habla del oficio.",
+        'material' => "Foco: La Nobleza del Material. Habla específicamente de la madera (veta, tacto, durabilidad). Compara la nobleza de lo natural frente a lo industrial.",
+        'refugio' => "Foco: Refugio y Calma. Cómo este mueble ayuda a crear un hogar que sea un santuario de paz y orden."
+    ];
+
+    // Diccionario de matices según el TONO
+    $matices_tono = [
+        'Cercano y Artesanal' => "Tono cálido, profesional pero humano, evocando el taller.",
+        'Poético y Minimalista' => "Usa frases muy cortas, evocadoras. Menos es más. Céntrate en la esencia y el silencio.",
+        'Sofisticado y Premium' => "Lenguaje elevado, enfocado en el lujo discreto, la exclusividad y el coleccionismo.",
+        'Técnico y Didáctico' => "Usa términos precisos sobre madera y acabados. Explica el 'por qué' de la calidad.",
+        'Inspirador / Lifestyle' => "Enfocado en el bienestar y la transformación del espacio vital."
+    ];
+
+    $instruccion_actual = $instrucciones_tipo[$tipo] ?? $instrucciones_tipo['storytelling'];
+    $matiz_actual = $matices_tono[$tono] ?? $matices_tono['Cercano y Artesanal'];
 
     $instrucciones = "
-    Eres el director creativo de Noxertez, una marca de alta artesanía en madera. Tu objetivo NO es vender un producto, sino proyectar un estilo de vida y una sensibilidad estética profunda.
+    Eres el director creativo de Noxertez, una marca de alta artesanía en madera. 
     
-    PAUTAS CRÍTICAS DE MARCA (PROHIBIDO INCUMPLIR):
-    1. PROHIBIDO usar lenguaje comercial genérico: Nada de '¡Compra ya!', 'Oferta', 'El mejor producto', 'Visita nuestra web'.
-    2. PROHIBIDO el tono corporativo aburrido: No hables como una empresa, habla como un artesano que ama su oficio.
-    3. PROHIBIDO el uso excesivo de hashtags genéricos: Solo usa los 3 o 4 permitidos.
+    OBJETIVO PRINCIPAL: $instruccion_actual
+    MATIZ DE VOZ: $matiz_actual
     
-    CONTEXTO VISUAL DE LA PIEZA:
+    PAUTAS CRÍTICAS DE MARCA:
+    1. PROHIBIDO usar lenguaje comercial genérico (¡Compra ya!, Oferta, Visita la web).
+    2. PROHIBIDO el tono corporativo aburrido. Habla como un artesano orgulloso.
+    3. HASHTAGS: Usa solo 3-4 relevantes.
+    
+    CONTEXTO VISUAL:
     - Ubicación: $estancia
-    - Atmósfera/Luz: $decoracion
-    - Ficha técnica: $info_prod
+    - Atmósfera: $decoracion
+    - Datos Pieza: $info_prod
     
     ESTRUCTURA DEL POST:
-    1. GANCHO EMOCIONAL: Una frase corta que evoque una sensación (paz, orden, calidez, lujo discreto).
-    2. NARRATIVA DE ESPACIO: Describe cómo la pieza interactúa con la luz y la estancia mencionada. Usa palabras como 'diálogo', 'carácter', 'refugio', 'esencia', 'madera viva'.
-    3. CRITERIO ESTÉTICO: Explica por qué esa pieza 'tiene sentido' en ese lugar. Habla del contraste de materiales o la armonía visual.
-    4. CIERRE SUTIL: Una invitación a apreciar los detalles o a imaginar esa atmósfera en su propio hogar.
+    1. GANCHO EMOCIONAL: Una frase corta impactante.
+    2. CUERPO: 2-3 párrafos cortos desarrollando el enfoque ($tipo).
+    3. CIERRE SUTIL: Una invitación a la reflexión o a apreciar los detalles.
     
     REGLAS TÉCNICAS:
-    - TONO: $tono (siempre manteniendo la elegancia de Noxertez).
     - VOZ: Primera persona (Nosotros/En Noxertez).
-    - FORMATO: Máximo 3-4 párrafos cortos. Usa emojis muy selectos (✨, 🪵, 🌿, 🏠).
-    - HASHTAGS: #artesaniadeautor #noxertez #diseñointerior #maderaexclusiva
+    - FORMATO: Máximo 3000 caracteres, pero preferiblemente breve.
+    - EMOJIS: Muy selectos (✨, 🪵, 🌿, 🏠).
+    - HASHTAGS PERMITIDOS: #artesaniadeautor #noxertez #diseñointerior #maderaexclusiva
     ";
 
     if (!empty($contexto)) {
-        $instrucciones .= "\nCONTEXTO ADICIONAL DEL USUARIO: $contexto";
+        $instrucciones .= "\n\nCONTEXTO ADICIONAL DEL USUARIO: $contexto";
     }
 
     return $instrucciones;

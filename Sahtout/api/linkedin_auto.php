@@ -34,7 +34,8 @@ if ($accion === 'get_mockups') {
 if ($accion === 'generate_one') {
     $mockup_id = $body['mockup_id'] ?? 0;
     $contexto_general = $body['contexto'] ?? '';
-    $tono = $body['tono'] ?? 'Profesional';
+    $tono = $body['tono'] ?? 'Cercano y Artesanal';
+    $tipo_enfoque = $body['tipo_enfoque'] ?? 'storytelling';
     $index = (int)($body['index'] ?? 0);
 
     // 1. Obtener datos del mockup
@@ -61,7 +62,8 @@ if ($accion === 'generate_one') {
         'decoracion' => $m['decoracion'],
         'info_prod'  => $info_prod,
         'contexto'   => $contexto_general,
-        'tono'       => $tono
+        'tono'       => $tono,
+        'tipo'       => $tipo_enfoque
     ]);
 
     // 3. Intentar llamar a la IA (Gemini o Groq)

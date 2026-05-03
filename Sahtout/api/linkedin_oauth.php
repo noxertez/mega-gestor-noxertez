@@ -104,6 +104,8 @@ if ($accion == 'save_config') {
     setCfg($db, 'linkedin_client_id', $body['client_id'] ?? '');
     setCfg($db, 'linkedin_client_secret', $body['client_secret'] ?? '');
     setCfg($db, 'linkedin_posts_por_semana', $body['pps'] ?? '3');
+    setCfg($db, 'linkedin_default_tono', $body['default_tono'] ?? 'Cercano y Artesanal');
+    setCfg($db, 'linkedin_default_enfoque', $body['default_enfoque'] ?? 'storytelling');
     echo json_encode(['ok' => true]);
     exit;
 }

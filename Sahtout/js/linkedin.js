@@ -211,7 +211,9 @@ window.guardarCredenciales = async function() {
     const data = { 
         client_id: document.getElementById('li_client_id').value, 
         client_secret: document.getElementById('li_client_secret').value, 
-        pps: document.getElementById('li_pps').value 
+        pps: document.getElementById('li_pps').value,
+        default_tono: document.getElementById('li_def_tono').value,
+        default_enfoque: document.getElementById('li_def_enfoque').value
     };
     try {
         const r = await fetch('../api/linkedin_oauth.php?accion=save_config', { method: 'POST', body: JSON.stringify(data) });
@@ -267,7 +269,13 @@ window.generarConIA = async function() {
     try {
         const r = await fetch('../api/linkedin_generate.php', { 
             method: 'POST', 
-            body: JSON.stringify({ tipo, sku_ref: sku, contexto, tono }) 
+            body: JSON.stringify({ 
+                tipo, 
+                sku_ref: sku, 
+                contexto, 
+                tono, 
+                tipo_enfoque: document.getElementById('li_ia_enfoque').value 
+            }) 
         });
         const d = await r.json();
         if (d.ok) { 
@@ -335,7 +343,14 @@ window.programarAutomatico = async function() {
         try {
             const r = await fetch('../api/linkedin_auto.php', { 
                 method: 'POST', 
-                body: JSON.stringify({ accion: 'generate_one', mockup_id: m.id, contexto: context, tono: tone, index: i }) 
+                body: JSON.stringify({ 
+                    accion: 'generate_one', 
+                    mockup_id: m.id, 
+                    contexto: context, 
+                    tono: tone, 
+                    tipo_enfoque: document.getElementById('li_auto_enfoque').value,
+                    index: i 
+                }) 
             });
             const d = await r.json();
             if (d.ok) { apiCalls++; document.getElementById('api-call-count').textContent = apiCalls; }

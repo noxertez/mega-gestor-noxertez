@@ -11,7 +11,8 @@ $body = json_decode(file_get_contents('php://input'), true);
 $tipo = $body['tipo'] ?? 'manual';
 $sku_ref = $body['sku_ref'] ?? '';
 $contexto = $body['contexto'] ?? '';
-$tono = $body['tono'] ?? 'Profesional';
+$tono = $body['tono'] ?? 'Cercano y Artesanal';
+$tipo_enfoque = $body['tipo_enfoque'] ?? 'storytelling';
 
 $db = conectar();
 
@@ -36,7 +37,8 @@ $prompt = getNoxertezLinkedinPrompt([
     'decoracion' => $decoracion,
     'info_prod'  => $producto_info,
     'contexto'   => $contexto,
-    'tono'       => $tono
+    'tono'       => $tono,
+    'tipo'       => $tipo_enfoque
 ]);
 
 // 4. Intentar llamar a la IA (Gemini o Groq)

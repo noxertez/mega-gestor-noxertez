@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json;\nconst texto = (body.texto || '').toLowerCase().trim();\n\nif (!texto) return [{ json: { accion: 'error', respuesta: 'No entendí el comando', datos: null } }];\n\nif (texto.match(/falt[ao]|anot[ao]|apunt[ao]|necesito|pide|pedir|añade|añadir|agreg/)) {\n  const limpio = texto.replace(/falta[n]?|anota|apunta|necesito|pide|pedir|añade|añadir|agrega|que|me|:/gi, '').replace(/\\s+/g, ' ').trim();\n  return [{ json: { accion: 'anotar_faltante', articulo: limpio, respuesta: `Anotado: falta ${limpio}`, datos: { articulo: limpio } } }];\n}\n\nif (texto.match(/qu[eé] hay que hacer|tareas|pendiente|qu[eé] tengo|hoy que|hacer hoy/)) {\n  return [{ json: { accion: 'consultar_tareas', respuesta: 'Consultando tus tareas...', datos: null } }];\n}\n\nif (texto.match(/pedido|pedidos|cu[aá]ntos hay|preparar/)) {\n  return [{ json: { accion: 'consultar_pedidos', respuesta: 'Consultando pedidos pendientes...', datos: null } }];\n}\n\nif (texto.match(/cu[aá]nto[s]?|stock|quedan|hay de|tengo de/)) {\n  const articulo = texto.replace(/cu[aá]ntos?|stock|quedan|hay de|tengo de|me/gi, '').replace(/\\s+/g, ' ').trim();\n  return [{ json: { accion: 'consultar_stock', articulo, respuesta: `Consultando stock de ${articulo}...`, datos: { articulo } } }];\n}\n\nif (texto.match(/resumen|c[oó]mo ha ido|ventas|hoy|d[ií]a/)) {\n  return [{ json: { accion: 'resumen_dia', respuesta: 'Preparando el resumen de hoy...', datos: null } }];\n}\n\nif (texto.match(/notificaci[oó]n|notificaciones|avisos?|alertas?/)) {\n  return [{ json: { accion: 'ver_notificaciones', respuesta: 'Consultando tus notificaciones...', datos: null } }];\n}\n\nreturn [{ json: { accion: 'no_entendido', respuesta: `No reconocí el comando: \"${body.texto}\". Puedes decir: qué hay que hacer, pedidos pendientes, stock de X, anotar que falta X, o resumen del día.`, datos: null } }];"
+        "jsCode": "const body = $input.first().json;\nconst texto = (body.texto || '').toLowerCase().trim();\n\nif (!texto) return [{ json: { accion: 'error', respuesta: 'No entendí el comando', datos: null } }];\n\nif (texto.match(/falt[ao]|anot[ao]|apunt[ao]|necesito|pide|pedir|añade|añadir|agreg/)) {\n  const limpio = texto.replace(/falta[n]?|anota|apunta|necesito|pide|pedir|añade|añadir|agrega|que|me|:/gi, '').replace(/\\s+/g, ' ').trim();\n  return [{ json: { accion: 'anotar_faltante', articulo: limpio, respuesta: `Anotado: falta ${limpio}`, datos: { articulo: limpio } } }];\n}\n\nif (texto.match(/qu[eé] hay que hacer|tareas|pendiente|qu[eé] tengo|hoy que|hacer hoy/)) {\n  return [{ json: { accion: 'consultar_tareas', respuesta: 'Consultando tus tareas...', datos: null } }];\n}\n\nif (texto.match(/pedido|pedidos|cu[aá]ntos hay|preparar/)) {\n  return [{ json: { accion: 'consultar_pedidos', respuesta: 'Consultando pedidos pendientes...', datos: null } }];\n}\n\nif (texto.match(/cu[aá]nto[s]?|stock|quedan|hay de|tengo de/)) {\n  const articulo = texto.replace(/cu[aá]ntos?|stock|quedan|hay de|tengo de|me/gi, '').replace(/\\s+/g, ' ').trim();\n  return [{ json: { accion: 'consultar_stock', articulo, respuesta: `Consultando stock de ${articulo}...`, datos: { articulo } } }];\n}\n\nif (texto.match(/resumen|c[oó]mo ha ido|ventas|hoy|d[ií]a/)) {\n  return [{ json: { accion: 'resumen_dia', respuesta: 'Preparando el resumen de hoy...', datos: null } }];\n}\n\nif (texto.match(/notificaci[oó]n|notificaciones|avisos?|alertas?/)) {\n  return [{ json: { accion: 'ver_notificaciones', respuesta: 'Consultando tus notificaciones...', datos: null } }];\n}\n\nif (texto.match(/d[oó]nde|ubica|encuentra|est[aá]|busca|localiza/)) {\n  const termino = texto\n    .replace(/d[oó]nde (est[aá]n?|hay)|ubica|encuentra|busca|localiza|los|las|el|la|me/gi, '')\n    .replace(/\\s+/g, ' ').trim();\n  return [{ json: {\n    accion: 'consultar_ubicacion',\n    articulo: termino,\n    respuesta: `Buscando ${termino}...`,\n    datos: { articulo: termino }\n  }}];\n}\n\nreturn [{ json: { accion: 'no_entendido', respuesta: `No reconocí el comando: \"${body.texto}\". Puedes decir: qué hay que hacer, pedidos pendientes, stock de X, anotar que falta X, dónde está X, o resumen del día.`, datos: null } }];"
       },
       "id": "node-interpretar",
       "name": "Interpretar comando de voz",
@@ -34,7 +34,8 @@
             { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "consultar_pedidos", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "pedidos" },
             { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "consultar_stock", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "stock" },
             { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "resumen_dia", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "resumen" },
-            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "ver_notificaciones", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "notificaciones" }
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "ver_notificaciones", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "notificaciones" },
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.accion }}", "rightValue": "consultar_ubicacion", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "ubicacion" }
           ]
         },
         "options": { "fallbackOutput": "extra" }
@@ -125,13 +126,26 @@
     },
     {
       "parameters": {
-        "jsCode": "const accion = $('Interpretar comando de voz').first().json.accion;\nlet respuesta = '';\n\nif (accion === 'anotar_faltante') {\n  const art = $('Interpretar comando de voz').first().json.datos.articulo;\n  respuesta = `Anotado. He añadido a tus tareas que falta ${art}.`;\n}\nelse if (accion === 'consultar_tareas') {\n  const tareas = $input.all();\n  if (!tareas || tareas.length === 0 || !tareas[0].json.descripcion) {\n    respuesta = 'No tienes tareas pendientes. Todo al día!';\n  } else {\n    const lista = tareas.map(t => t.json.descripcion).join('. ');\n    respuesta = `Tienes ${tareas.length} tarea${tareas.length > 1 ? 's' : ''} pendiente${tareas.length > 1 ? 's' : ''}. ${lista}.`;\n  }\n}\nelse if (accion === 'consultar_pedidos') {\n  const pedidos = $input.all();\n  if (!pedidos || pedidos.length === 0 || !pedidos[0].json.numero_pedido) {\n    respuesta = 'No tienes pedidos pendientes. Estás al día!';\n  } else {\n    respuesta = `Tienes ${pedidos.length} pedido${pedidos.length > 1 ? 's' : ''} pendiente${pedidos.length > 1 ? 's' : ''} de preparar.`;\n    if (pedidos.length <= 3) {\n      const lista = pedidos.map(p => `el de ${p.json.nombre_cliente}`).join(', ');\n      respuesta += ` Son: ${lista}.`;\n    }\n  }\n}\nelse if (accion === 'consultar_stock') {\n  const items = $input.all();\n  if (!items || items.length === 0 || !items[0].json.nombre) {\n    const art = $('Interpretar comando de voz').first().json.datos.articulo;\n    respuesta = `No encontré ningún artículo con el nombre ${art}.`;\n  } else {\n    respuesta = items.map(i => `${i.json.nombre}: ${i.json.stock} unidades`).join('. ') + '.';\n  }\n}\nelse if (accion === 'resumen_dia') {\n  const stats = $input.first().json;\n  const pedidos = stats.pedidos || 0;\n  const facturado = parseFloat(stats.facturado || 0).toFixed(2);\n  respuesta = pedidos === 0 ? 'Hoy no hay pedidos registrados todavía.' : `Hoy llevas ${pedidos} pedido${pedidos > 1 ? 's' : ''} y has facturado ${facturado} euros.`;\n}\nelse if (accion === 'ver_notificaciones') {\n  const notifs = $input.all();\n  if (!notifs || notifs.length === 0 || !notifs[0].json.mensaje) {\n    respuesta = 'No tienes notificaciones sin leer. Todo tranquilo!';\n  } else {\n    respuesta = `Tienes ${notifs.length} notificación${notifs.length > 1 ? 'es' : ''} sin leer. La más reciente: ${notifs[0].json.mensaje}.`;\n  }\n}\nelse {\n  respuesta = $('Interpretar comando de voz').first().json.respuesta;\n}\n\nreturn [{ json: { respuesta, accion } }];"
+        "operation": "executeQuery",
+        "query": "SELECT\n  COALESCE(a.nombre, m.NOMBRE) as nombre,\n  COALESCE(a.referencia, m.REF_MAT) as referencia,\n  COALESCE(ap.ubicacion, m.ubicacion) as ubicacion,\n  COALESCE(ap.etiqueta, '') as etiqueta\nFROM almacen_posiciones ap\nLEFT JOIN articulos a ON a.referencia LIKE CONCAT('%', '{{ $('Interpretar comando de voz').first().json.datos.articulo }}', '%')\nLEFT JOIN materiales m ON m.NOMBRE LIKE CONCAT('%', '{{ $('Interpretar comando de voz').first().json.datos.articulo }}', '%')\nWHERE ap.etiqueta = COALESCE(ap.etiqueta, '')\n  AND (\n    a.nombre LIKE CONCAT('%', '{{ $('Interpretar comando de voz').first().json.datos.articulo }}', '%')\n    OR a.referencia LIKE CONCAT('%', '{{ $('Interpretar comando de voz').first().json.datos.articulo }}', '%')\n    OR m.NOMBRE LIKE CONCAT('%', '{{ $('Interpretar comando de voz').first().json.datos.articulo }}', '%')\n    OR m.REF_MAT LIKE CONCAT('%', '{{ $('Interpretar comando de voz').first().json.datos.articulo }}', '%')\n  )\nLIMIT 3",
+        "options": {}
+      },
+      "id": "node-ubicacion",
+      "name": "Consultar ubicación artículo",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [900, 780],
+      "credentials": { "mySql": { "id": "", "name": "MySQL account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const accion = $('Interpretar comando de voz').first().json.accion;\nlet respuesta = '';\n\nif (accion === 'anotar_faltante') {\n  const art = $('Interpretar comando de voz').first().json.datos.articulo;\n  respuesta = `Anotado. He añadido a tus tareas que falta ${art}.`;\n}\nelse if (accion === 'consultar_tareas') {\n  const tareas = $input.all();\n  if (!tareas || tareas.length === 0 || !tareas[0].json.descripcion) {\n    respuesta = 'No tienes tareas pendientes. Todo al día!';\n  } else {\n    const lista = tareas.map(t => t.json.descripcion).join('. ');\n    respuesta = `Tienes ${tareas.length} tarea${tareas.length > 1 ? 's' : ''} pendiente${tareas.length > 1 ? 's' : ''}. ${lista}.`;\n  }\n}\nelse if (accion === 'consultar_pedidos') {\n  const pedidos = $input.all();\n  if (!pedidos || pedidos.length === 0 || !pedidos[0].json.numero_pedido) {\n    respuesta = 'No tienes pedidos pendientes. Estás al día!';\n  } else {\n    respuesta = `Tienes ${pedidos.length} pedido${pedidos.length > 1 ? 's' : ''} pendiente${pedidos.length > 1 ? 's' : ''} de preparar.`;\n    if (pedidos.length <= 3) {\n      const lista = pedidos.map(p => `el de ${p.json.nombre_cliente}`).join(', ');\n      respuesta += ` Son: ${lista}.`;\n    }\n  }\n}\nelse if (accion === 'consultar_stock') {\n  const items = $input.all();\n  if (!items || items.length === 0 || !items[0].json.nombre) {\n    const art = $('Interpretar comando de voz').first().json.datos.articulo;\n    respuesta = `No encontré ningún artículo con el nombre ${art}.`;\n  } else {\n    respuesta = items.map(i => `${i.json.nombre}: ${i.json.stock} unidades`).join('. ') + '.';\n  }\n}\nelse if (accion === 'resumen_dia') {\n  const stats = $input.first().json;\n  const pedidos = stats.pedidos || 0;\n  const facturado = parseFloat(stats.facturado || 0).toFixed(2);\n  respuesta = pedidos === 0 ? 'Hoy no hay pedidos registrados todavía.' : `Hoy llevas ${pedidos} pedido${pedidos > 1 ? 's' : ''} y has facturado ${facturado} euros.`;\n}\nelse if (accion === 'ver_notificaciones') {\n  const notifs = $input.all();\n  if (!notifs || notifs.length === 0 || !notifs[0].json.mensaje) {\n    respuesta = 'No tienes notificaciones sin leer. Todo tranquilo!';\n  } else {\n    respuesta = `Tienes ${notifs.length} notificación${notifs.length > 1 ? 'es' : ''} sin leer. La más reciente: ${notifs[0].json.mensaje}.`;\n  }\n}\nelse if (accion === 'consultar_ubicacion') {\n  const items = $input.all();\n  const art = $('Interpretar comando de voz').first().json.datos.articulo;\n  if (!items || !items[0].json.nombre) {\n    respuesta = `No encontré dónde está ${art} en el almacén.`;\n  } else {\n    respuesta = items.map(i => {\n      const ubic = i.json.ubicacion || 'ubicación no asignada';\n      return `${i.json.nombre} está en ${ubic}`;\n    }).join('. ') + '.';\n  }\n}\nelse {\n  respuesta = $('Interpretar comando de voz').first().json.respuesta;\n}\n\nreturn [{ json: { respuesta, accion } }];"
       },
       "id": "node-construir-respuesta",
       "name": "Construir respuesta de voz",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1140, 380]
+      "position": [1140, 420]
     },
     {
       "parameters": {
@@ -142,7 +156,7 @@
       "name": "Devolver respuesta a la app",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1360, 380],
+      "position": [1360, 420],
       "notes": "La app recibe 'respuesta' y usa window.speechSynthesis para leerla en voz alta"
     }
   ],
@@ -161,16 +175,18 @@
         [{ "node": "Consultar stock artículo", "type": "main", "index": 0 }],
         [{ "node": "Resumen del día", "type": "main", "index": 0 }],
         [{ "node": "Ver notificaciones", "type": "main", "index": 0 }],
+        [{ "node": "Consultar ubicación artículo", "type": "main", "index": 0 }],
         [{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]
       ]
     },
-    "Anotar artículo faltante": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
-    "Leer tareas pendientes": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
-    "Leer pedidos pendientes": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
-    "Consultar stock artículo": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
-    "Resumen del día": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
-    "Ver notificaciones": { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
-    "Construir respuesta de voz": { "main": [[{ "node": "Devolver respuesta a la app", "type": "main", "index": 0 }]] }
+    "Anotar artículo faltante":          { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Leer tareas pendientes":            { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Leer pedidos pendientes":           { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Consultar stock artículo":          { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Resumen del día":                   { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Ver notificaciones":                { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Consultar ubicación artículo":      { "main": [[{ "node": "Construir respuesta de voz", "type": "main", "index": 0 }]] },
+    "Construir respuesta de voz":        { "main": [[{ "node": "Devolver respuesta a la app", "type": "main", "index": 0 }]] }
   },
   "settings": { "executionOrder": "v1" },
   "tags": ["asistente", "voz", "noxertez"]

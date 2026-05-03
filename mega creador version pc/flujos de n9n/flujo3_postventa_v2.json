@@ -8,7 +8,7 @@
         }
       },
       "id": "node-trigger",
-      "name": "Revisar cada 4 horas",
+      "name": "[POST-VENTA] Revisar cada 4 horas",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [200, 300]
@@ -85,7 +85,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('seguimiento_postventa', CONCAT('📬 Seguimiento pendiente de enviar a ', '{{ $json.nombre_cliente }}', ' - Pedido ', '{{ $json.numero_pedido }}'), NOW(), 0)",
+        "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('seguimiento_postventa', CONCAT('📬 Seguimiento pendiente de enviar a ', '{{ $(\"Preparar mensaje seguimiento\").json.nombre_cliente }}', ' - Pedido ', '{{ $(\"Preparar mensaje seguimiento\").json.numero_pedido }}'), NOW(), 0)",
         "options": {}
       },
       "id": "node-notif",

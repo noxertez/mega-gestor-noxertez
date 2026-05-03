@@ -40,7 +40,9 @@ $claves_init = [
     'linkedin_refresh_token' => '',
     'linkedin_token_expires' => '',
     'linkedin_person_urn' => '',
-    'linkedin_posts_por_semana' => '3'
+    'linkedin_posts_por_semana' => '3',
+    'linkedin_default_tono' => 'Cercano y Artesanal',
+    'linkedin_default_enfoque' => 'storytelling'
 ];
 
 foreach ($claves_init as $c => $v) {
@@ -253,6 +255,30 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
                     <label>Posts por semana (Recomendado: 3-5)</label>
                     <input type="number" id="li_pps" class="input-wow" style="width:100%" value="<?php echo (int)$cfg['linkedin_posts_por_semana']; ?>">
                 </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:1.8rem;">
+                    <div class="nox-form-group">
+                        <label>Tono predeterminado</label>
+                        <select id="li_def_tono" class="input-wow">
+                            <option value="Cercano y Artesanal" <?php echo ($cfg['linkedin_default_tono'] ?? '') == 'Cercano y Artesanal' ? 'selected' : ''; ?>>Cercano y Artesanal</option>
+                            <option value="Poético y Minimalista" <?php echo ($cfg['linkedin_default_tono'] ?? '') == 'Poético y Minimalista' ? 'selected' : ''; ?>>Poético y Minimalista</option>
+                            <option value="Sofisticado y Premium" <?php echo ($cfg['linkedin_default_tono'] ?? '') == 'Sofisticado y Premium' ? 'selected' : ''; ?>>Sofisticado y Premium</option>
+                            <option value="Técnico y Didáctico" <?php echo ($cfg['linkedin_default_tono'] ?? '') == 'Técnico y Didáctico' ? 'selected' : ''; ?>>Técnico y Didáctico</option>
+                            <option value="Inspirador / Lifestyle" <?php echo ($cfg['linkedin_default_tono'] ?? '') == 'Inspirador / Lifestyle' ? 'selected' : ''; ?>>Inspirador / Lifestyle</option>
+                        </select>
+                    </div>
+                    <div class="nox-form-group">
+                        <label>Enfoque predeterminado</label>
+                        <select id="li_def_enfoque" class="input-wow">
+                            <option value="storytelling" <?php echo ($cfg['linkedin_default_enfoque'] ?? '') == 'storytelling' ? 'selected' : ''; ?>>Narrativa de Marca</option>
+                            <option value="lanzamiento" <?php echo ($cfg['linkedin_default_enfoque'] ?? '') == 'lanzamiento' ? 'selected' : ''; ?>>Lanzamiento / Nuevo</option>
+                            <option value="interiorismo" <?php echo ($cfg['linkedin_default_enfoque'] ?? '') == 'interiorismo' ? 'selected' : ''; ?>>Interiorismo</option>
+                            <option value="detalles" <?php echo ($cfg['linkedin_default_enfoque'] ?? '') == 'detalles' ? 'selected' : ''; ?>>Detalles de Autor</option>
+                            <option value="material" <?php echo ($cfg['linkedin_default_enfoque'] ?? '') == 'material' ? 'selected' : ''; ?>>Nobleza Material</option>
+                            <option value="refugio" <?php echo ($cfg['linkedin_default_enfoque'] ?? '') == 'refugio' ? 'selected' : ''; ?>>Refugio y Calma</option>
+                        </select>
+                    </div>
+                </div>
                 
                 <div style="margin: 1.5rem 0;">
                     <label style="display:block; margin-bottom:8px; color:var(--text-gray);">Estado del Token:</label>
@@ -370,14 +396,28 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
                         <label>Instrucciones adicionales para Gemini</label>
                         <textarea id="li_ia_contexto" class="input-wow" style="width:100%" rows="3" placeholder="Ej: Menciona que es para el día del padre..."></textarea>
                     </div>
-                    <div class="nox-form-group">
-                        <label>Tono</label>
-                        <select id="li_ia_tono" class="input-wow" style="width:100%">
-                            <option value="Profesional">Profesional</option>
-                            <option value="Cercano">Cercano</option>
-                            <option value="Inspirador">Inspirador</option>
-                            <option value="Informativo">Informativo</option>
-                        </select>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:1.5rem;">
+                        <div class="nox-form-group" style="margin-bottom:0;">
+                            <label>Tono</label>
+                            <select id="li_ia_tono" class="input-wow" style="width:100%">
+                                <option value="Cercano y Artesanal">Cercano y Artesanal</option>
+                                <option value="Poético y Minimalista">Poético y Minimalista</option>
+                                <option value="Sofisticado y Premium">Sofisticado y Premium</option>
+                                <option value="Técnico y Didáctico">Técnico y Didáctico</option>
+                                <option value="Inspirador / Lifestyle">Inspirador / Lifestyle</option>
+                            </select>
+                        </div>
+                        <div class="nox-form-group" style="margin-bottom:0;">
+                            <label>Enfoque</label>
+                            <select id="li_ia_enfoque" class="input-wow" style="width:100%">
+                                <option value="storytelling">Narrativa de Marca</option>
+                                <option value="lanzamiento">Lanzamiento / Nuevo</option>
+                                <option value="interiorismo">Interiorismo</option>
+                                <option value="detalles">Detalles de Autor</option>
+                                <option value="material">Nobleza Material</option>
+                                <option value="refugio">Refugio y Calma</option>
+                            </select>
+                        </div>
                     </div>
                     <button onclick="generarConIA()" class="btn-premium-wow btn-gold" style="width:100%; justify-content:center;">
                         <i class="fas fa-robot"></i> 🤖 Generar con Gemini
@@ -422,14 +462,28 @@ body { background-color: var(--bg-dark) !important; color: var(--text-white); fo
                         <label>Instrucciones para Gemini</label>
                         <textarea id="li_auto_contexto" class="input-wow" style="width:100%" rows="3" placeholder="Contexto para todos los posts..."></textarea>
                     </div>
-                    <div class="nox-form-group">
-                        <label>Tono</label>
-                        <select id="li_auto_tono" class="input-wow" style="width:100%">
-                            <option value="Profesional">Profesional</option>
-                            <option value="Cercano">Cercano</option>
-                            <option value="Inspirador">Inspirador</option>
-                            <option value="Informativo">Informativo</option>
-                        </select>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:1.5rem;">
+                        <div class="nox-form-group" style="margin-bottom:0;">
+                            <label>Tono</label>
+                            <select id="li_auto_tono" class="input-wow" style="width:100%">
+                                <option value="Cercano y Artesanal">Cercano y Artesanal</option>
+                                <option value="Poético y Minimalista">Poético y Minimalista</option>
+                                <option value="Sofisticado y Premium">Sofisticado y Premium</option>
+                                <option value="Técnico y Didáctico">Técnico y Didáctico</option>
+                                <option value="Inspirador / Lifestyle">Inspirador / Lifestyle</option>
+                            </select>
+                        </div>
+                        <div class="nox-form-group" style="margin-bottom:0;">
+                            <label>Enfoque</label>
+                            <select id="li_auto_enfoque" class="input-wow" style="width:100%">
+                                <option value="storytelling">Narrativa de Marca</option>
+                                <option value="lanzamiento">Lanzamiento / Nuevo</option>
+                                <option value="interiorismo">Interiorismo</option>
+                                <option value="detalles">Detalles de Autor</option>
+                                <option value="material">Nobleza Material</option>
+                                <option value="refugio">Refugio y Calma</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div style="background:rgba(212,175,55,0.05); padding:15px; border-radius:12px; border:1px solid var(--border-glass); margin-bottom:1.5rem;">

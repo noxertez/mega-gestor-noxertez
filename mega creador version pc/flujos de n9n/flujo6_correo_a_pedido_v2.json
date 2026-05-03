@@ -3,6 +3,18 @@
   "nodes": [
     {
       "parameters": {
+        "content": "### 📦 GESTIÓN DE PEDIDOS\nEste flujo monitoriza correos entrantes y los guarda como BORRADORES en el CMS.\n\n**Emails aceptados:** pedidos@noxertez.com",
+        "height": 160,
+        "width": 300
+      },
+      "id": "sticky-pedidos",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
         "pollTimes": {
           "item": [{ "mode": "everyMinute" }]
         },
@@ -13,7 +25,7 @@
         "postProcessAction": "read"
       },
       "id": "node-imap",
-      "name": "Nuevo Correo IMAP",
+      "name": "[PEDIDOS] Nuevo Correo IMAP",
       "type": "n8n-nodes-base.emailReadImap",
       "typeVersion": 2,
       "position": [200, 300],
@@ -21,7 +33,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\nconst cuerpo = (email.text || email.html || '').toLowerCase();\n\n// === FILTRO ANTI-BUCLE: ignorar correos de noxertez ===\nconst esPropio = de.includes('noxertez@gmail.com') || \n                 de.includes('@noxertez.com') ||\n                 de.includes('mailer-daemon') ||\n                 de.includes('postmaster');\n\n// === FILTRO ANTI-SPAM ===\nconst dominiosSpam = [\n  'wallapop', 'vinted', 'milanuncios', 'vibbo', 'todocoleccion',\n  'noreply', 'no-reply', 'donotreply', 'do-not-reply',\n  'newsletter', 'notification', 'notifications', 'marketing',\n  'info@', 'support@', 'hello@', 'team@', 'news@',\n  'mailchimp', 'sendgrid', 'mailjet', 'brevo', 'sendinblue',\n  'google.com', 'facebook.com', 'instagram.com', 'twitter.com',\n  'linkedin.com', 'amazon.com', 'ebay.com'\n];\nconst esSpam = dominiosSpam.some(d => de.includes(d));\n\n// === FILTRO ASUNTO SPAM ===\nconst asuntosSpam = [\n  'unsubscribe', 'darse de baja', 'newsletter', 'oferta especial',\n  'promocion', 'descuento', 'publicidad', 'notificacion automatica',\n  'do not reply', 'automatic reply', 'out of office', 'fuera de oficina'\n];\nconst asuntoEsSpam = asuntosSpam.some(a => asunto.includes(a));\n\n// === DETECTAR A QUÉ CORREO FUE ENVIADO ===\nlet tipoPedido = 'desconocido';\nif (para.includes('pedidos@noxertez.com')) tipoPedido = 'pedido_directo';\nelse if (para.includes('info@noxertez.com')) tipoPedido = 'info_general';\nelse if (para.includes('influencer@noxertez.com')) tipoPedido = 'influencer';\nelse if (para.includes('ayuda@noxertez.com')) tipoPedido = 'soporte';\nelse if (para.includes('noxertez@gmail.com')) tipoPedido = 'gmail_directo';\n\n// === RESULTADO ===\nconst ignorar = esPropio || esSpam || asuntoEsSpam;\n\nreturn [{ json: {\n  ignorar,\n  motivo_ignorar: esPropio ? 'correo_propio' : esSpam ? 'spam_remitente' : asuntoEsSpam ? 'spam_asunto' : null,\n  tipo: tipoPedido,\n  de: email.from || '',\n  para: email.to || '',\n  asunto: email.subject || '',\n  cuerpo_raw: (email.text || '').substring(0, 500),\n  fecha: new Date().toISOString()\n}}];"
+        "jsCode": "const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\nconst cuerpo = (email.text || email.html || '').toLowerCase();\n\n// === FILTRO ANTI-BUCLE: ignorar correos de noxertez ===\nconst esPropio = de.includes('noxertez@gmail.com') || \n                 de.includes('@noxertez.com') ||\n                 de.includes('mailer-daemon') ||\n                 de.includes('postmaster');\n\n// === FILTRO ANTI-SPAM ===\nconst dominiosSpam = [\n  'wallapop', 'vinted', 'milanuncios', 'vibbo', 'todocoleccion',\n  'noreply', 'no-reply', 'donotreply', 'do-not-reply',\n  'newsletter', 'notification', 'notifications', 'marketing',\n  'support@', 'hello@', 'team@', 'news@',\n  'mailchimp', 'sendgrid', 'mailjet', 'brevo', 'sendinblue',\n  'google.com', 'facebook.com', 'instagram.com', 'twitter.com',\n  'linkedin.com', 'amazon.com', 'ebay.com'\n];\nconst esSpam = dominiosSpam.some(d => de.includes(d));\n\n// === FILTRO ASUNTO SPAM ===\nconst asuntosSpam = [\n  'unsubscribe', 'darse de baja', 'newsletter', 'oferta especial',\n  'promocion', 'descuento', 'publicidad', 'notificacion automatica',\n  'do not reply', 'automatic reply', 'out of office', 'fuera de oficina'\n];\nconst asuntoEsSpam = asuntosSpam.some(a => asunto.includes(a));\n\n// === DETECTAR A QUÉ CORREO FUE ENVIADO ===\nlet tipoPedido = 'desconocido';\nif (para.includes('pedidos@noxertez.com')) tipoPedido = 'pedido_directo';\nelse if (para.includes('info@noxertez.com')) tipoPedido = 'info_general';\nelse if (para.includes('influencer@noxertez.com')) tipoPedido = 'influencer';\nelse if (para.includes('ayuda@noxertez.com')) tipoPedido = 'soporte';\nelse if (para.includes('noxertez@gmail.com')) tipoPedido = 'gmail_directo';\n\n// === RESULTADO ===\nconst ignorar = esPropio || esSpam || asuntoEsSpam;\n\nreturn [{ json: {\n  ignorar,\n  motivo_ignorar: esPropio ? 'correo_propio' : esSpam ? 'spam_remitente' : asuntoEsSpam ? 'spam_asunto' : null,\n  tipo: tipoPedido,\n  de: email.from || '',\n  para: email.to || '',\n  asunto: email.subject || '',\n  cuerpo_raw: (email.text || '').substring(0, 500),\n  fecha: new Date().toISOString()\n}}];"
       },
       "id": "node-filtrar",
       "name": "Filtrar spam y bucles",
@@ -97,7 +109,7 @@
     }
   ],
   "connections": {
-    "Nuevo Correo IMAP": {
+    "[PEDIDOS] Nuevo Correo IMAP": {
       "main": [[{ "node": "Filtrar spam y bucles", "type": "main", "index": 0 }]]
     },
     "Filtrar spam y bucles": {

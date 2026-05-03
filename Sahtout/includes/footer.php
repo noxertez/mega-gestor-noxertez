@@ -186,3 +186,261 @@ if (defined('ALLOWED_ACCESS')) {
 <div id="nox-chatbot-root" data-base="<?php echo htmlspecialchars($base_path); ?>"></div>
 <script src="<?php echo htmlspecialchars($base_path); ?>assets/js/chatbot_widget.js"></script>
 <?php endif; ?>
+
+<?php
+// ============================================================
+// WIDGET FLOTANTE DE VOZ — Solo para admins
+// ============================================================
+$mostrar_widget_voz = false;
+if (defined('ALLOWED_ACCESS') && !empty($_SESSION['user_id']) && isset($_SESSION['role'])) {
+    $mostrar_widget_voz = in_array($_SESSION['role'], ['admin', 'moderator']);
+}
+?>
+<?php if ($mostrar_widget_voz): ?>
+<style>
+/* ─── Widget Voz Flotante ──────────────────────────────────────────── */
+#voz-widget-flotante {
+    position: fixed;
+    bottom: 90px;
+    right: 22px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    font-family: 'Inter', 'Outfit', sans-serif;
+}
+
+#voz-burbuja {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    border: 2px solid #c9a84c;
+    color: #c9a84c;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    user-select: none;
+}
+#voz-burbuja:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 28px rgba(201,168,76,0.35);
+}
+#voz-burbuja.widget-escuchando {
+    border-color: #ef4444;
+    color: #ef4444;
+    animation: widgetPulse 1.2s ease-in-out infinite;
+}
+@keyframes widgetPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+    50%       { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+}
+
+#voz-panel {
+    background: rgba(15,15,30,0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(201,168,76,0.35);
+    border-radius: 14px;
+    padding: 14px 16px;
+    max-width: 260px;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    position: relative;
+}
+#voz-panel::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    right: 18px;
+    width: 14px;
+    height: 14px;
+    background: rgba(15,15,30,0.92);
+    border-right: 1px solid rgba(201,168,76,0.35);
+    border-bottom: 1px solid rgba(201,168,76,0.35);
+    transform: rotate(45deg);
+}
+#voz-status {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.5;
+    color: #fff;
+    margin-bottom: 6px;
+}
+#voz-transcript {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.6);
+    min-height: 1.1em;
+    font-style: italic;
+    margin-bottom: 8px;
+}
+#voz-respuesta {
+    font-size: 0.95rem;
+    color: #c9a84c;
+    font-weight: 600;
+    line-height: 1.4;
+}
+</style>
+
+<div id="voz-widget-flotante">
+    <div id="voz-panel" style="display:none">
+        <div id="voz-status">Pulsa para hablar</div>
+        <div id="voz-transcript"></div>
+        <div id="voz-respuesta">¿En qué te ayudo?</div>
+    </div>
+    <div id="voz-burbuja" onclick="widgetToggleVoice()" title="Asistente de voz">
+        <i class="fas fa-microphone"></i>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ─── Prefixing: no conflictos con asistente_voz.php ─────────────────────
+    if (window.location.pathname.includes('asistente_voz')) return;
+
+    let widgetRec = null;
+    let widgetListening = false;
+    let widgetSilenceTimer = null;
+    let widgetCollapseTimer = null;
+    let widgetVoices = [];
+
+    // Cargar voces disponibles
+    function widgetCargarVoces() {
+        widgetVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
+    }
+    if (window.speechSynthesis) {
+        widgetCargarVoces();
+        window.speechSynthesis.onvoiceschanged = widgetCargarVoces;
+    }
+
+    function widgetHablar(texto) {
+        if (!window.speechSynthesis || !texto) return;
+        const synth = window.speechSynthesis;
+        const utt = new SpeechSynthesisUtterance(texto);
+        utt.lang = 'es-ES';
+        utt.rate = 1;
+        utt.pitch = 1;
+        const voz = widgetVoices.find(v => v.lang.startsWith('es') && v.name.toLowerCase().includes('fem'))
+                 || widgetVoices.find(v => v.lang.startsWith('es'))
+                 || null;
+        if (voz) utt.voice = voz;
+        synth.cancel();
+        synth.speak(utt);
+    }
+
+    function widgetSetStatus(txt) {
+        document.getElementById('voz-status').innerText = txt;
+    }
+    function widgetSetTranscript(txt) {
+        document.getElementById('voz-transcript').innerText = txt;
+    }
+    function widgetSetRespuesta(txt) {
+        document.getElementById('voz-respuesta').innerText = txt;
+    }
+
+    // Inicializar reconocimiento
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        widgetRec = new SR();
+        widgetRec.lang = 'es-ES';
+        widgetRec.continuous = true;
+        widgetRec.interimResults = true;
+
+        widgetRec.onstart = () => {
+            widgetListening = true;
+            document.getElementById('voz-burbuja').classList.add('widget-escuchando');
+            widgetSetStatus('Escuchando...');
+            widgetResetSilence();
+        };
+
+        widgetRec.onresult = (event) => {
+            let final = '', interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                else interim += event.results[i][0].transcript;
+            }
+            widgetSetTranscript(final || interim);
+            if (final || interim) widgetResetSilence();
+        };
+
+        widgetRec.onend = () => {
+            widgetListening = false;
+            document.getElementById('voz-burbuja').classList.remove('widget-escuchando');
+            widgetSetStatus('Procesando...');
+            clearTimeout(widgetSilenceTimer);
+            const texto = document.getElementById('voz-transcript').innerText.trim();
+            if (texto.length > 2) widgetProcesar(texto);
+            else widgetColapsar();
+        };
+
+        widgetRec.onerror = () => {
+            widgetListening = false;
+            document.getElementById('voz-burbuja').classList.remove('widget-escuchando');
+            widgetSetStatus('Error de micrófono');
+        };
+    }
+
+    function widgetResetSilence() {
+        clearTimeout(widgetSilenceTimer);
+        widgetSilenceTimer = setTimeout(() => {
+            if (widgetListening && widgetRec) widgetRec.stop();
+        }, 4000);
+    }
+
+    window.widgetToggleVoice = function() {
+        const panel = document.getElementById('voz-panel');
+
+        if (widgetListening) {
+            if (widgetRec) widgetRec.stop();
+            widgetColapsar();
+            return;
+        }
+
+        // Abrir panel
+        panel.style.display = 'block';
+        clearTimeout(widgetCollapseTimer);
+        widgetSetTranscript('');
+        widgetSetRespuesta('¿En qué te ayudo?');
+        widgetSetStatus('Pulsa para hablar');
+
+        if (!widgetRec) {
+            widgetSetStatus('Micrófono no disponible');
+            return;
+        }
+        try { widgetRec.start(); } catch(e) {}
+    };
+
+    function widgetColapsar() {
+        clearTimeout(widgetCollapseTimer);
+        widgetCollapseTimer = setTimeout(() => {
+            document.getElementById('voz-panel').style.display = 'none';
+        }, 6000);
+    }
+
+    async function widgetProcesar(texto) {
+        widgetSetStatus('Consultando asistente...');
+        try {
+            const res = await fetch('http://localhost:5678/webhook/asistente', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ texto })
+            });
+            const data = await res.json();
+            widgetSetTranscript('');
+            widgetSetRespuesta(data.respuesta || '—');
+            widgetSetStatus('Asistente');
+            widgetHablar(data.respuesta);
+        } catch(e) {
+            widgetSetRespuesta('Error conectando con el asistente.');
+            widgetSetStatus('Error');
+        }
+        widgetColapsar();
+    }
+})();
+</script>
+<?php endif; ?>
