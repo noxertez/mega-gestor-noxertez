@@ -238,6 +238,19 @@ body{background-color:var(--bg-dark)!important;color:#ffffff;font-family:'Cinzel
 /* Mini thumbnails (Stock style) */
 .img-mini-wow { width:32px; height:32px; border-radius:6px; object-fit:cover; border:1px solid var(--border-glass); background:#000; transition:transform 0.2s,box-shadow 0.2s; }
 .img-mini-wow:hover { transform:scale(3); z-index:10; box-shadow:0 4px 15px rgba(0,0,0,0.5); position:relative; }
+
+/* Optimization for mobile - Modal Art Detail */
+@media(max-width: 768px) {
+    .modal-box { width: 98%; margin-bottom: 20px; }
+    .modal-head { flex-direction: column; gap: 12px; text-align: center; padding: 15px; }
+    .modal-head div { width: 100%; flex-direction: column; gap: 8px; }
+    .modal-head .btn { width: 100% !important; padding: 12px !important; }
+    .modal-body { padding: 15px; }
+    #modalArtDetail .modal-body > div { grid-template-columns: 1fr !important; gap: 20px !important; }
+    #modalArtDetail div[style*="position:sticky"] { position: relative !important; top: 0 !important; }
+    #artDetailImg { height: 280px !important; }
+    #artDetailMocks { max-height: 500px !important; }
+}
 </style>
 
 <div id="modalArtDetail" class="modal-over" onclick="if(event.target===this)closeArtDetail()">

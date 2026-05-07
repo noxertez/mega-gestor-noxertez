@@ -101,7 +101,12 @@ def consultar_asistente(texto_voz: str) -> str:
       "pedidos pendientes"
       "resumen del día"
     """
-    payload = {"texto": texto_voz}
+    payload = {
+        "texto": texto_voz, 
+        "query": texto_voz, 
+        "message": texto_voz, 
+        "body": {"texto": texto_voz}
+    }
     try:
         r = requests.post(f"{N8N_BASE}/asistente", json=payload, timeout=8)
         data = r.json()

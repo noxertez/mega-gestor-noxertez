@@ -219,12 +219,58 @@ $current_tab = $_GET['tab'] ?? 'bloc';
 
 <div class="panel-management">
     
+    <style>
+        .dual-mic-container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 20px;
+        }
+        .mic-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .mic-wrapper span {
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: var(--text-gray);
+            letter-spacing: 1px;
+        }
+        .mic-btn-premium.cerebro {
+            background: linear-gradient(135deg, #1e40af, #1e3a8a);
+            border-color: #60a5fa;
+        }
+        .mic-btn-premium.corazon {
+            background: linear-gradient(135deg, #991b1b, #7f1d1d);
+            border-color: #f87171;
+        }
+        .mic-btn-premium.active.cerebro {
+            box-shadow: 0 0 30px rgba(96, 165, 250, 0.6);
+        }
+        .mic-btn-premium.active.corazon {
+            box-shadow: 0 0 30px rgba(248, 113, 113, 0.6);
+        }
+    </style>
+
     <div class="voice-control-panel">
-        <button id="mic-btn" class="mic-btn-premium" onclick="toggleVoice()">
-            <i class="fas fa-microphone"></i>
-        </button>
-        <div style="margin-top: 15px;">
-            <div id="status" style="font-size: 0.7rem; opacity: 0.5; text-transform: uppercase;">Asistente Inteligente</div>
+        <div class="dual-mic-container">
+            <div class="mic-wrapper">
+                <button id="mic-btn-cerebro" class="mic-btn-premium cerebro" onclick="toggleVoice('general')">
+                    <i class="fas fa-brain"></i>
+                </button>
+                <span>CEREBRO</span>
+            </div>
+            <div class="mic-wrapper">
+                <button id="mic-btn-corazon" class="mic-btn-premium corazon" onclick="toggleVoice('corazones')">
+                    <i class="fas fa-heart"></i>
+                </button>
+                <span>UBICACIÓN</span>
+            </div>
+        </div>
+        <div style="margin-top: 5px;">
+            <div id="status" style="font-size: 0.7rem; opacity: 0.5; text-transform: uppercase;">Pulsa para hablar</div>
             <div id="transcript" style="font-size: 0.9rem; opacity: 0.7; height: 1.5rem; margin-top: 5px;"></div>
             <div id="response" style="font-size: 1.2rem; color: var(--accent-gold); font-weight: bold;">¿En qué puedo ayudarte hoy?</div>
         </div>
@@ -519,95 +565,82 @@ async function deleteSelectedNotes() {
 
 let recognition;
 let isListening = false;
-let silenceTimer;
+let currentMode = 'general';
 
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
     recognition.lang = 'es-ES';
-    recognition.continuous = true; // Permite pausas largas sin detenerse
-    recognition.interimResults = true; // Feedback en tiempo real
+    recognition.continuous = false; 
+    recognition.interimResults = true; 
 
     recognition.onstart = () => { 
         isListening = true;
-        document.getElementById('mic-btn').classList.add('active'); 
-        document.getElementById('status').innerText = 'ESCUCHANDO... (Más tiempo activado)'; 
-        resetSilenceTimer();
+        const btnId = currentMode === 'general' ? 'mic-btn-cerebro' : 'mic-btn-corazon';
+        document.getElementById(btnId).classList.add('active'); 
+        document.getElementById('status').innerText = 'ESCUCHANDO ' + currentMode.toUpperCase() + '...'; 
     };
 
     recognition.onresult = (event) => { 
         let interimTranscript = '';
         let finalTranscript = '';
-
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
-            } else {
-                interimTranscript += event.results[i][0].transcript;
-            }
+            if (event.results[i].isFinal) finalTranscript += event.results[i][0].transcript;
+            else interimTranscript += event.results[i][0].transcript;
         }
-
-        const currentText = finalTranscript || interimTranscript;
-        document.getElementById('transcript').innerText = currentText;
-        
-        if (finalTranscript || interimTranscript) {
-            resetSilenceTimer(); // Reiniciamos el tiempo cada vez que detecta voz
-        }
+        document.getElementById('transcript').innerText = finalTranscript || interimTranscript;
     };
 
     recognition.onend = () => { 
         isListening = false;
-        document.getElementById('mic-btn').classList.remove('active'); 
-        document.getElementById('status').innerText = 'ASISTENTE'; 
-        clearTimeout(silenceTimer);
+        document.getElementById('mic-btn-cerebro').classList.remove('active'); 
+        document.getElementById('mic-btn-corazon').classList.remove('active'); 
+        document.getElementById('status').innerText = 'PROCESANDO...'; 
         
         const textoFinal = document.getElementById('transcript').innerText;
-        if (textoFinal.trim().length > 2) {
-            procesarVoz(textoFinal); 
+        if (textoFinal.trim().length > 1) {
+            procesarVoz(textoFinal, currentMode); 
+        } else {
+            document.getElementById('status').innerText = 'PULSA PARA HABLAR';
         }
     };
 
     recognition.onerror = (event) => {
         console.error('Error de reconocimiento:', event.error);
         isListening = false;
-        document.getElementById('mic-btn').classList.remove('active');
+        document.getElementById('mic-btn-cerebro').classList.remove('active');
+        document.getElementById('mic-btn-corazon').classList.remove('active');
         document.getElementById('status').innerText = 'ERROR';
     };
 }
 
-function resetSilenceTimer() {
-    clearTimeout(silenceTimer);
-    // Damos 4 segundos de margen de silencio antes de procesar automáticamente
-    silenceTimer = setTimeout(() => {
-        if (isListening && recognition) {
-            recognition.stop();
-        }
-    }, 4000); 
-}
-
-function toggleVoice() { 
-    if (!recognition) return;
+function toggleVoice(modo) { 
+    if (!recognition) {
+        alert("Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.");
+        return;
+    }
     if (isListening) {
         recognition.stop();
     } else {
+        currentMode = modo;
+        document.getElementById('transcript').innerText = "";
         recognition.start(); 
     }
 }
 
-async function procesarVoz(texto) {
+async function procesarVoz(texto, modo) {
     if(!texto.trim()) return;
-    document.getElementById('response').innerText = "Procesando...";
+    document.getElementById('response').innerText = "...";
     
     try {
         const res = await fetch('api/asistente_voz_n8n.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ texto })
+            body: JSON.stringify({ texto, modo })
         });
         const data = await res.json();
         document.getElementById('response').innerText = data.respuesta;
-        document.getElementById('transcript').innerText = ""; // Limpiar tras procesar
-        // ── Leer en voz alta la respuesta ──
+        document.getElementById('status').innerText = 'PULSA PARA HABLAR';
         hablarRespuesta(data.respuesta);
         if (data.accion === 'reload_tasks') {
             setTimeout(() => location.reload(), 2000);

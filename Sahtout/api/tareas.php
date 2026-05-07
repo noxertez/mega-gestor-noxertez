@@ -38,6 +38,17 @@ elseif ($metodo === 'POST') {
         exit;
     }
 
+    if ($accion === 'borrar_masivo') {
+        $ids = $body['ids'] ?? [];
+        if (!empty($ids)) {
+            $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+            $stmt = $db->prepare("DELETE FROM tareas WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+        }
+        echo json_encode(['ok' => true]);
+        exit;
+    }
+
     $stmt = $db->prepare(
         'INSERT INTO tareas (descripcion, prioridad, fecha_limite) VALUES (?, ?, ?)'
     );

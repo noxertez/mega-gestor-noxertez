@@ -55,4 +55,25 @@ Se ha diseñado un sistema de gestión de activos (imágenes y vídeos) con arqu
 - **Sesión 3**: Restauración del sistema de redes sociales. Mapeo de columnas profesionales y creación automática de campos faltantes. Implementación de contadores de uso real.
 
 ---
-*Última actualización: 30 de Abril de 2026 - Fase ANIMAL Iniciada.*
+
+# 🏡 FASE: la mafia de los palts (Mayo 2026)
+
+## 🎙️ 1. Asistente de Voz y Ecosistema n8n
+Tras un periodo de inestabilidad en la comunicación entre el navegador y los flujos de automatización, se ha rediseñado el puente de datos.
+
+### 🔌 Solución de Conectividad (El Proxy PHP)
+- **Problema:** Errores de red y bloqueos de CORS al intentar llamar a `localhost:5678` directamente desde el JS del navegador.
+- **Solución:** Creación de `api/asistente_voz_n8n.php`. Este script actúa como un túnel seguro. El frontend habla con PHP, y PHP habla con n8n vía cURL interno. 
+- **Robustez:** El proxy envía el texto simultáneamente en el cuerpo (JSON), en la URL (Query Params) y como formulario, asegurando que n8n lo reciba sin importar la configuración del nodo.
+
+### 💉 Inyección de Código en Base de Datos n8n
+- **Hito Técnico:** Se ha desarrollado una técnica de "Inyección SQL" para actualizar la lógica de n8n sin entrar al editor visual.
+- **Script:** `inject_n8n.py`. Accede directamente a `database.sqlite` de n8n y modifica el `jsCode` del nodo "Interpretar comando de voz".
+- **Mejora:** El nuevo código es "Universal": busca la variable `texto` en `body.texto`, `query.texto` y `params.texto`.
+
+## 📱 2. Optimizaciones de Interfaz (UI/UX)
+- **Mockups en Móvil:** Ajuste de Media Queries en `mockups.php` para evitar el desbordamiento de los modales de detalle en pantallas pequeñas.
+- **Lógica de Estadísticas:** Inclusión de artículos con sufijo `p01` como "Artículos Base" en los rankings de cobertura de catálogo.
+
+---
+*Última actualización: 4 de Mayo de 2026 - Fase la mafia de los paltes Activa.*

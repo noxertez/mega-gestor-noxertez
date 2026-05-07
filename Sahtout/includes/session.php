@@ -9,8 +9,12 @@ if (
 }
 
 // Force correct session cookie params
+$session_lifetime = 604800; // 7 days in seconds
+ini_set('session.gc_maxlifetime', $session_lifetime);
+ini_set('session.cookie_lifetime', $session_lifetime);
+
 session_set_cookie_params([
-    'lifetime' => 0,
+    'lifetime' => $session_lifetime,
     'path' => '/',
     'domain' => '',        // current domain
     'secure' => $is_https,

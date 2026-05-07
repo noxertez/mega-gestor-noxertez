@@ -198,51 +198,55 @@ if (defined('ALLOWED_ACCESS') && !empty($_SESSION['user_id']) && isset($_SESSION
 ?>
 <?php if ($mostrar_widget_voz): ?>
 <style>
-/* ─── Widget Voz Flotante ──────────────────────────────────────────── */
+/* ─── Widget Voz Flotante (Dual Mode) ──────────────────────────────── */
 #voz-widget-flotante {
     position: fixed;
     bottom: 90px;
     right: 22px;
     z-index: 9999;
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse; /* Apila hacia arriba */
     align-items: flex-end;
-    gap: 10px;
+    gap: 12px;
     font-family: 'Inter', 'Outfit', sans-serif;
 }
 
-#voz-burbuja {
+.voz-burbuja-base {
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    background: #1a1a2e;
-    border: 2px solid #c9a84c;
-    color: #c9a84c;
-    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-    user-select: none;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    font-size: 20px;
+    border: 2px solid;
 }
-#voz-burbuja:hover {
-    transform: scale(1.08);
-    box-shadow: 0 6px 28px rgba(201,168,76,0.35);
+
+#voz-burbuja-general {
+    background: #1a1a2e;
+    border-color: #c9a84c;
+    color: #c9a84c;
 }
-#voz-burbuja.widget-escuchando {
+
+#voz-burbuja-corazones {
+    background: #2e1a1a;
     border-color: #ef4444;
     color: #ef4444;
-    animation: widgetPulse 1.2s ease-in-out infinite;
 }
+
+.voz-burbuja-base:hover { transform: scale(1.1); }
+.voz-burbuja-base.widget-escuchando { animation: widgetPulse 1.2s infinite; }
+
 @keyframes widgetPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-    50%       { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(201,168,76,0.5); }
+    50%       { box-shadow: 0 0 0 10px rgba(201,168,76,0); }
 }
 
 #voz-panel {
-    background: rgba(15,15,30,0.92);
+    background: rgba(15,15,30,0.95);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(201,168,76,0.35);
     border-radius: 14px;
@@ -251,6 +255,7 @@ if (defined('ALLOWED_ACCESS') && !empty($_SESSION['user_id']) && isset($_SESSION
     min-width: 200px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.6);
     position: relative;
+    margin-bottom: 10px;
 }
 #voz-panel::after {
     content: '';
@@ -264,52 +269,44 @@ if (defined('ALLOWED_ACCESS') && !empty($_SESSION['user_id']) && isset($_SESSION
     border-bottom: 1px solid rgba(201,168,76,0.35);
     transform: rotate(45deg);
 }
-#voz-status {
-    font-size: 0.65rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    opacity: 0.5;
-    color: #fff;
-    margin-bottom: 6px;
-}
-#voz-transcript {
-    font-size: 0.78rem;
-    color: rgba(255,255,255,0.6);
-    min-height: 1.1em;
-    font-style: italic;
-    margin-bottom: 8px;
-}
-#voz-respuesta {
-    font-size: 0.95rem;
-    color: #c9a84c;
-    font-weight: 600;
-    line-height: 1.4;
-}
+#voz-status { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: #fff; opacity: 0.6; margin-bottom: 4px; }
+#voz-transcript { font-size: 0.78rem; color: rgba(255,255,255,0.6); font-style: italic; margin-bottom: 8px; }
+#voz-respuesta { font-size: 0.95rem; color: #c9a84c; font-weight: 600; line-height: 1.4; }
+.modo-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: bold; margin-bottom: 8px; }
+.badge-general { background: #c9a84c; color: #000; }
+.badge-corazones { background: #ef4444; color: #fff; }
 </style>
 
 <div id="voz-widget-flotante">
     <div id="voz-panel" style="display:none">
+        <div id="voz-modo-display" class="modo-badge">MODO</div>
         <div id="voz-status">Pulsa para hablar</div>
         <div id="voz-transcript"></div>
         <div id="voz-respuesta">¿En qué te ayudo?</div>
     </div>
-    <div id="voz-burbuja" onclick="widgetToggleVoice()" title="Asistente de voz">
-        <i class="fas fa-microphone"></i>
+    
+    <!-- Burbuja GENERAL (MODO 05) -->
+    <div id="voz-burbuja-general" class="voz-burbuja-base" onclick="widgetToggleVoice('general')" title="Asistente General (05)">
+        <i class="fas fa-brain"></i>
+    </div>
+
+    <!-- Burbuja CORAZONES (MODO PRO) -->
+    <div id="voz-burbuja-corazones" class="voz-burbuja-base" onclick="widgetToggleVoice('corazones')" title="Buscador de Corazones (PRO)">
+        <i class="fas fa-heart"></i>
     </div>
 </div>
 
 <script>
 (function() {
-    // ─── Prefixing: no conflictos con asistente_voz.php ─────────────────────
     if (window.location.pathname.includes('asistente_voz')) return;
 
     let widgetRec = null;
     let widgetListening = false;
+    let widgetModoActual = 'general';
     let widgetSilenceTimer = null;
     let widgetCollapseTimer = null;
     let widgetVoices = [];
 
-    // Cargar voces disponibles
     function widgetCargarVoces() {
         widgetVoices = window.speechSynthesis ? window.speechSynthesis.getVoices() : [];
     }
@@ -323,27 +320,12 @@ if (defined('ALLOWED_ACCESS') && !empty($_SESSION['user_id']) && isset($_SESSION
         const synth = window.speechSynthesis;
         const utt = new SpeechSynthesisUtterance(texto);
         utt.lang = 'es-ES';
-        utt.rate = 1;
-        utt.pitch = 1;
-        const voz = widgetVoices.find(v => v.lang.startsWith('es') && v.name.toLowerCase().includes('fem'))
-                 || widgetVoices.find(v => v.lang.startsWith('es'))
-                 || null;
+        const voz = widgetVoices.find(v => v.lang.startsWith('es') && v.name.toLowerCase().includes('fem')) || widgetVoices.find(v => v.lang.startsWith('es'));
         if (voz) utt.voice = voz;
         synth.cancel();
         synth.speak(utt);
     }
 
-    function widgetSetStatus(txt) {
-        document.getElementById('voz-status').innerText = txt;
-    }
-    function widgetSetTranscript(txt) {
-        document.getElementById('voz-transcript').innerText = txt;
-    }
-    function widgetSetRespuesta(txt) {
-        document.getElementById('voz-respuesta').innerText = txt;
-    }
-
-    // Inicializar reconocimiento
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
         const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
         widgetRec = new SR();
@@ -353,91 +335,76 @@ if (defined('ALLOWED_ACCESS') && !empty($_SESSION['user_id']) && isset($_SESSION
 
         widgetRec.onstart = () => {
             widgetListening = true;
-            document.getElementById('voz-burbuja').classList.add('widget-escuchando');
-            widgetSetStatus('Escuchando...');
-            widgetResetSilence();
+            document.querySelectorAll('.voz-burbuja-base').forEach(b => b.classList.remove('widget-escuchando'));
+            const idBurbuja = widgetModoActual === 'general' ? 'voz-burbuja-general' : 'voz-burbuja-corazones';
+            document.getElementById(idBurbuja).classList.add('widget-escuchando');
+            document.getElementById('voz-status').innerText = 'Escuchando...';
         };
 
         widgetRec.onresult = (event) => {
-            let final = '', interim = '';
+            let final = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 if (event.results[i].isFinal) final += event.results[i][0].transcript;
-                else interim += event.results[i][0].transcript;
             }
-            widgetSetTranscript(final || interim);
-            if (final || interim) widgetResetSilence();
+            if (final) {
+                document.getElementById('voz-transcript').innerText = final;
+                widgetResetSilence();
+            }
         };
 
         widgetRec.onend = () => {
             widgetListening = false;
-            document.getElementById('voz-burbuja').classList.remove('widget-escuchando');
-            widgetSetStatus('Procesando...');
-            clearTimeout(widgetSilenceTimer);
+            document.querySelectorAll('.voz-burbuja-base').forEach(b => b.classList.remove('widget-escuchando'));
             const texto = document.getElementById('voz-transcript').innerText.trim();
             if (texto.length > 2) widgetProcesar(texto);
             else widgetColapsar();
-        };
-
-        widgetRec.onerror = () => {
-            widgetListening = false;
-            document.getElementById('voz-burbuja').classList.remove('widget-escuchando');
-            widgetSetStatus('Error de micrófono');
         };
     }
 
     function widgetResetSilence() {
         clearTimeout(widgetSilenceTimer);
-        widgetSilenceTimer = setTimeout(() => {
-            if (widgetListening && widgetRec) widgetRec.stop();
-        }, 4000);
+        widgetSilenceTimer = setTimeout(() => { if (widgetListening) widgetRec.stop(); }, 3000);
     }
 
-    window.widgetToggleVoice = function() {
+    window.widgetToggleVoice = function(modo) {
+        widgetModoActual = modo;
         const panel = document.getElementById('voz-panel');
-
-        if (widgetListening) {
-            if (widgetRec) widgetRec.stop();
-            widgetColapsar();
-            return;
-        }
-
-        // Abrir panel
+        const badge = document.getElementById('voz-modo-display');
+        
+        badge.innerText = modo.toUpperCase();
+        badge.className = 'modo-badge ' + (modo === 'general' ? 'badge-general' : 'badge-corazones');
+        
         panel.style.display = 'block';
-        clearTimeout(widgetCollapseTimer);
-        widgetSetTranscript('');
-        widgetSetRespuesta('¿En qué te ayudo?');
-        widgetSetStatus('Pulsa para hablar');
-
-        if (!widgetRec) {
-            widgetSetStatus('Micrófono no disponible');
-            return;
-        }
-        try { widgetRec.start(); } catch(e) {}
+        document.getElementById('voz-transcript').innerText = '';
+        document.getElementById('voz-respuesta').innerText = '¿En qué te ayudo?';
+        
+        if (widgetRec) widgetRec.start();
     };
 
     function widgetColapsar() {
-        clearTimeout(widgetCollapseTimer);
-        widgetCollapseTimer = setTimeout(() => {
-            document.getElementById('voz-panel').style.display = 'none';
-        }, 6000);
+        widgetCollapseTimer = setTimeout(() => { document.getElementById('voz-panel').style.display = 'none'; }, 5000);
     }
 
+    const API_BASE = '<?php echo rtrim($base_path, "/"); ?>';
+
     async function widgetProcesar(texto) {
-        widgetSetStatus('Consultando asistente...');
+        document.getElementById('voz-status').innerText = 'Procesando...';
+        document.getElementById('voz-respuesta').innerText = '...';
         try {
-            const res = await fetch('api/asistente_voz_n8n.php', {
+            const res = await fetch(API_BASE + '/api/asistente_voz_n8n.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ texto })
+                body: JSON.stringify({ texto, modo: widgetModoActual })
             });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
-            widgetSetTranscript('');
-            widgetSetRespuesta(data.respuesta || '—');
-            widgetSetStatus('Asistente');
-            widgetHablar(data.respuesta);
+            const msg = data.respuesta || 'Sin respuesta del servidor.';
+            document.getElementById('voz-respuesta').innerText = msg;
+            widgetHablar(msg);
         } catch(e) {
-            widgetSetRespuesta('Error conectando con el asistente.');
-            widgetSetStatus('Error');
+            const err = 'Error de conexión: ' + e.message;
+            document.getElementById('voz-respuesta').innerText = err;
+            console.error('[Asistente]', e);
         }
         widgetColapsar();
     }
