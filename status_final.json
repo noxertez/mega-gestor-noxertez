@@ -1,1 +1,3051 @@
-[{"updatedAt":"2026-05-07T01:45:00.000Z","createdAt":"2026-05-06T21:10:59.291Z","id":"n2ZQ2yhnmTY2zcxZ","name":"Asistente_Voz_PRO","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"httpMethod":"POST","path":"asistente-pro","responseMode":"lastNode"},"name":"Webhook_Asistente","type":"n8n-nodes-base.webhook","typeVersion":1,"position":[100,200],"id":"ef20585d-ebcb-4673-b448-2fdcf9904670"},{"parameters":{"jsCode":"const body = $input.first().json.body || $input.first().json; const texto = (body.texto || '').toLowerCase().trim(); let articulo = texto.replace(/donde esta|dónde está|ubica|busca|donde/gi, '').trim(); return [{ json: { accion: 'consultar_ubicacion', articulo } }];"},"name":"Code_Interpret","type":"n8n-nodes-base.code","typeVersion":2,"position":[300,200],"id":"4d6dcce3-aedd-4c7e-9285-005be7842a70"},{"parameters":{"url":"=http://localhost/noxertez/n8n_mysql_proxy.php?articulo={{ $json.articulo }}","responseFormat":"json"},"name":"Proxy_SQL_Location","type":"n8n-nodes-base.httpRequest","typeVersion":4.1,"position":[500,200],"id":"07bb45ca-1b07-4791-ad23-16b8881e58d0"},{"parameters":{"jsCode":"const items = $input.all(); if (items.length === 0 || !items[0].json) return [{ json: { respuesta: 'Error.' } }]; const data = items[0].json; if (!data || (Array.isArray(data) && data.length === 0)) return [{ json: { respuesta: 'No encontré la ubicación.' } }]; const item = Array.isArray(data) ? data[0] : data; return [{ json: { respuesta: `${item.nombre} está en ${item.ubicacion}.` } }];"},"name":"Code_Response_Builder","type":"n8n-nodes-base.code","typeVersion":2,"position":[700,200],"id":"560f99aa-4c30-42cb-958d-0c8d62dd4f92"},{"parameters":{"options":{}},"name":"Webhook_Responder","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[900,200],"id":"5080afc1-d01c-4fcf-8538-8f8ae1d7d708"}],"connections":{"Webhook_Asistente":{"main":[[{"node":"Code_Interpret","type":"main","index":0}]]},"Code_Interpret":{"main":[[{"node":"Proxy_SQL_Location","type":"main","index":0}]]},"Proxy_SQL_Location":{"main":[[{"node":"Code_Response_Builder","type":"main","index":0}]]},"Code_Response_Builder":{"main":[[{"node":"Webhook_Responder","type":"main","index":0}]]}},"settings":{},"staticData":null,"meta":null,"pinData":null,"versionId":"6f5ad485-1909-421e-9444-d2961ec635a3","activeVersionId":"6f5ad485-1909-421e-9444-d2961ec635a3","versionCounter":8,"triggerCount":1,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:10:59.294Z","createdAt":"2026-05-06T21:10:59.294Z","role":"workflow:owner","workflowId":"n2ZQ2yhnmTY2zcxZ","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version 6f5ad485","description":""}},{"updatedAt":"2026-05-06T22:07:38.212Z","createdAt":"2026-05-06T21:31:29.525Z","id":"7045a416-8f3f-44","name":"01 - Pedido Manual desde App Noxertez (v2)","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"httpMethod":"POST","path":"nuevo-pedido","responseMode":"lastNode","options":{}},"id":"node-webhook","name":"Webhook Pedido Manual","type":"n8n-nodes-base.webhook","typeVersion":1,"position":[208,304],"webhookId":"b47cd27c-6039-4c00-8e57-897bd1871732","notes":"URL: http://localhost:5678/webhook/nuevo-pedido — Tu app llama aquí al crear un pedido"},{"parameters":{"jsCode":"const body = $input.first().json;\n\nif (!body.items || body.items.length === 0) {\n  throw new Error('El pedido no tiene artículos');\n}\n\nconst numeroPedido = 'PED-' + Date.now();\nlet total = 0;\n\nconst items = body.items.map(item => {\n  const subtotal = (parseFloat(item.precio) || 0) * (parseInt(item.cantidad) || 1);\n  total += subtotal;\n  return {\n    referencia: item.referencia || item.sku || 'SIN-REF',\n    nombre: item.nombre || item.referencia || 'Artículo sin nombre',\n    cantidad: parseInt(item.cantidad) || 1,\n    precio_unit: parseFloat(item.precio) || 0,\n    subtotal: subtotal\n  };\n});\n\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: body.telefono || '',\n  nombre_cliente: body.cliente || body.nombre_cliente || 'Cliente sin nombre',\n  id_cliente: body.id_cliente || null,\n  items_json: JSON.stringify(items),\n  total: parseFloat(total.toFixed(2)),\n  estado: 'pendiente',\n  fecha_pedido: new Date().toISOString().slice(0, 19).replace('T', ' '),\n  canal: body.canal || 'manual',\n  canal_origen: body.canal_origen || 'directo',\n  notas: body.notas || ''\n}}];"},"id":"node-preparar","name":"Preparar datos pedido","type":"n8n-nodes-base.code","typeVersion":2,"position":[448,304]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, id_cliente, items_json, total, estado, fecha_pedido, canal, canal_origen, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', {{ $json.id_cliente || 'NULL' }}, '{{ $json.items_json }}', {{ $json.total }}, '{{ $json.estado }}', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.canal_origen }}', '{{ $json.notas }}')","options":{}},"id":"node-mysql","name":"Guardar en MySQL","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[672,304],"credentials":{"mySql":{"id":"fkWyb95ZdBmRmE6n","name":"Noxertez MySQL"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('pedido_nuevo', CONCAT('📦 Nuevo pedido manual: ', '{{ $json.numero_pedido }}', ' - ', '{{ $json.nombre_cliente }}', ' (', '{{ $json.total }}', '€)'), NOW(), 0)","options":{}},"id":"node-notif","name":"Notificación nuevo pedido","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[880,304],"credentials":{"mySql":{"id":"fkWyb95ZdBmRmE6n","name":"Noxertez MySQL"}}},{"parameters":{"respondWith":"json","responseBody":"={{ JSON.stringify({ ok: true, numero_pedido: $('Preparar datos pedido').first().json.numero_pedido, total: $('Preparar datos pedido').first().json.total, mensaje: 'Pedido guardado correctamente' }) }}","options":{}},"id":"node-responder","name":"Responder a la app","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1104,304]}],"connections":{"Webhook Pedido Manual":{"main":[[{"node":"Preparar datos pedido","type":"main","index":0}]]},"Preparar datos pedido":{"main":[[{"node":"Guardar en MySQL","type":"main","index":0}]]},"Guardar en MySQL":{"main":[[{"node":"Notificación nuevo pedido","type":"main","index":0}]]},"Notificación nuevo pedido":{"main":[[{"node":"Responder a la app","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":{},"versionId":"cac905c3-f330-4a73-9240-a67d5671bfea","activeVersionId":"cac905c3-f330-4a73-9240-a67d5671bfea","versionCounter":7,"triggerCount":1,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:29.528Z","createdAt":"2026-05-06T21:31:29.528Z","role":"workflow:owner","workflowId":"7045a416-8f3f-44","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version cac905c3","description":""}},{"updatedAt":"2026-05-06T22:10:38.390Z","createdAt":"2026-05-06T21:31:33.694Z","id":"da76fb39-8abf-43","name":"02 - Parsear Mensaje WhatsApp (v2)","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"httpMethod":"POST","path":"parsear-mensaje","responseMode":"lastNode","options":{}},"id":"node-webhook","name":"Webhook Parsear Mensaje","type":"n8n-nodes-base.webhook","typeVersion":1,"position":[208,304],"webhookId":"efdd7fe0-c6d2-49a1-a4d2-2f8b4abfe4ed","notes":"URL: http://localhost:5678/webhook/parsear-mensaje — Tu app manda aquí el texto copiado de WhatsApp"},{"parameters":{"jsCode":"const body = $input.first().json;\nconst texto = (body.texto || '').trim();\nconst t = texto.toLowerCase();\n\nif (!texto) {\n  return [{ json: { error: 'Texto vacío', ok: false } }];\n}\n\n// Detectar intención\nlet intencion = 'consulta';\nif (t.match(/quiero|pedir|necesito|manda|env[ií]a|dame|pedido|comprar|encarg/)) intencion = 'pedido';\nelse if (t.match(/estado|donde|cuando|llega|mi pedido|ped-/)) intencion = 'estado_pedido';\nelse if (t.match(/precio|cu[aá]nto|cuesta|vale|coste/)) intencion = 'precio';\nelse if (t.match(/stock|quedan|hay|disponible|tienes/)) intencion = 'stock';\n\n// Detectar número de pedido mencionado\nconst pedidoMencionado = (texto.match(/PED-\\d+/i) || [])[0] || null;\n\n// Extraer items con cantidad\nconst patronCantidad = /(\\d+)\\s*(?:x|de|uds?|unidades?|piezas?)?\\s*([a-záéíóúñA-ZÁÉÍÓÚÑ0-9\\s\\-\\/]{3,50})/gi;\nconst itemsEncontrados = [];\nlet match;\nwhile ((match = patronCantidad.exec(texto)) !== null) {\n  const cantidad = parseInt(match[1]);\n  const producto = match[2].trim().replace(/\\s+/g, ' ');\n  if (cantidad > 0 && cantidad < 1000 && producto.length > 2) {\n    itemsEncontrados.push({ cantidad, descripcion: producto });\n  }\n}\n\n// Extraer teléfono si viene\nconst telMatch = texto.match(/(?:\\+34|0034)?\\s*[6789]\\d{8}/);\nconst telefono = telMatch ? telMatch[0].replace(/\\s/g, '') : (body.telefono || '');\n\nreturn [{ json: {\n  ok: true,\n  intencion,\n  texto_original: texto,\n  telefono,\n  nombre: body.nombre || '',\n  items_detectados: itemsEncontrados,\n  pedido_mencionado: pedidoMencionado,\n  timestamp: new Date().toISOString()\n}}];"},"id":"node-parsear","name":"Parsear texto del mensaje","type":"n8n-nodes-base.code","typeVersion":2,"position":[432,304]},{"parameters":{"rules":{"values":[{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.intencion }}","rightValue":"pedido","operator":{"type":"string","operation":"equals"}}]},"renameOutput":true,"outputKey":"pedido"},{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.intencion }}","rightValue":"estado_pedido","operator":{"type":"string","operation":"equals"}}]},"renameOutput":true,"outputKey":"estado"}]},"options":{"fallbackOutput":"extra"}},"id":"node-switch","name":"Enrutar por intención","type":"n8n-nodes-base.switch","typeVersion":3,"position":[640,304]},{"parameters":{"jsCode":"const d = $input.first().json;\nconst numeroPedido = 'PED-' + Date.now();\nconst items = d.items_detectados.map(item => ({\n  referencia: 'PENDIENTE',\n  nombre: item.descripcion,\n  cantidad: item.cantidad,\n  precio_unit: 0,\n  subtotal: 0\n}));\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: d.telefono,\n  nombre_cliente: d.nombre || 'Por identificar',\n  items_json: JSON.stringify(items),\n  estado: 'borrador',\n  fecha_pedido: d.timestamp.slice(0, 19).replace('T', ' '),\n  canal: 'whatsapp_manual',\n  canal_origen: 'whatsapp',\n  notas: 'Parseado automáticamente. Revisar precios y referencias. Texto: ' + d.texto_original.substring(0, 200)\n}}];"},"id":"node-crear-borrador","name":"Crear borrador pedido","type":"n8n-nodes-base.code","typeVersion":2,"position":[880,160]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, items_json, total, estado, fecha_pedido, canal, canal_origen, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.items_json }}', 0, 'borrador', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.canal_origen }}', '{{ $json.notas }}')","options":{}},"id":"node-guardar-borrador","name":"Guardar borrador MySQL","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1104,160],"credentials":{"mySql":{"id":"fkWyb95ZdBmRmE6n","name":"Noxertez MySQL"}}},{"parameters":{"respondWith":"json","responseBody":"={{ JSON.stringify({ ok: true, intencion: 'pedido', items_detectados: $('Parsear texto del mensaje').first().json.items_detectados, numero_pedido: $('Crear borrador pedido').first().json.numero_pedido, mensaje: 'Borrador creado. Revisa y completa precios en la app.' }) }}","options":{}},"id":"node-resp-pedido","name":"Responder: borrador creado","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1328,160]},{"parameters":{"operation":"executeQuery","query":"SELECT numero_pedido, estado, fecha_pedido, total FROM pedidos WHERE (numero_pedido = '{{ $json.pedido_mencionado }}' OR (telefono = '{{ $json.telefono }}' AND telefono != '')) ORDER BY fecha_pedido DESC LIMIT 3","options":{}},"id":"node-buscar-estado","name":"Buscar estado pedido","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[880,368],"credentials":{"mySql":{"id":"fkWyb95ZdBmRmE6n","name":"Noxertez MySQL"}}},{"parameters":{"respondWith":"json","responseBody":"={{ JSON.stringify({ ok: true, intencion: 'estado_pedido', pedidos: $input.all().map(i => i.json), mensaje: 'Pedidos encontrados' }) }}","options":{}},"id":"node-resp-estado","name":"Responder: estado pedidos","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1104,368]},{"parameters":{"respondWith":"json","responseBody":"={{ JSON.stringify({ ok: true, intencion: $('Parsear texto del mensaje').first().json.intencion, items_detectados: $('Parsear texto del mensaje').first().json.items_detectados, mensaje: 'Mensaje analizado. Intención: ' + $('Parsear texto del mensaje').first().json.intencion }) }}","options":{}},"id":"node-resp-otro","name":"Responder: otro tipo","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[880,544]}],"connections":{"Webhook Parsear Mensaje":{"main":[[{"node":"Parsear texto del mensaje","type":"main","index":0}]]},"Parsear texto del mensaje":{"main":[[{"node":"Enrutar por intención","type":"main","index":0}]]},"Enrutar por intención":{"main":[[{"node":"Crear borrador pedido","type":"main","index":0}],[{"node":"Buscar estado pedido","type":"main","index":0}],[{"node":"Responder: otro tipo","type":"main","index":0}]]},"Crear borrador pedido":{"main":[[{"node":"Guardar borrador MySQL","type":"main","index":0}]]},"Guardar borrador MySQL":{"main":[[{"node":"Responder: borrador creado","type":"main","index":0}]]},"Buscar estado pedido":{"main":[[{"node":"Responder: estado pedidos","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":{},"versionId":"30506455-b49e-46e3-a06b-ffb54e29d516","activeVersionId":"30506455-b49e-46e3-a06b-ffb54e29d516","versionCounter":7,"triggerCount":1,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:33.697Z","createdAt":"2026-05-06T21:31:33.697Z","role":"workflow:owner","workflowId":"da76fb39-8abf-43","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version 30506455","description":""}},{"updatedAt":"2026-05-06T22:11:00.623Z","createdAt":"2026-05-06T21:31:38.190Z","id":"2906f52b-1085-4d","name":"03 - Seguimiento Post-Venta (v2)","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"hours","hoursInterval":4}]}},"id":"node-trigger","name":"[POST-VENTA] Revisar cada 4 horas","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[208,304]},{"parameters":{"operation":"executeQuery","query":"SELECT numero_pedido, telefono, nombre_cliente, fecha_entrega FROM pedidos WHERE estado = 'entregado' AND seguimiento_enviado = 0 AND fecha_entrega IS NOT NULL AND DATE_ADD(fecha_entrega, INTERVAL 24 HOUR) <= NOW() LIMIT 10","options":{}},"id":"node-buscar","name":"Buscar pedidos para seguimiento","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[448,304],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.numero_pedido }}","rightValue":"","operator":{"type":"string","operation":"notEquals"}}]},"options":{}},"id":"node-hay","name":"¿Hay pedidos?","type":"n8n-nodes-base.if","typeVersion":2,"position":[672,304]},{"parameters":{"jsCode":"const d = $input.first().json;\nconst nombre = d.nombre_cliente || 'cliente';\nconst pedido = d.numero_pedido || '';\nconst texto = `Hola ${nombre}! 😊 Han pasado 24h desde que recibiste tu pedido ${pedido}. ¿Todo llegó perfectamente? ¿Estás contento con tu compra? Nos encantaría saberlo. ¡Gracias por confiar en Noxertez! 🪵`;\nreturn [{ json: {\n  numero_pedido: pedido,\n  telefono: d.telefono || '',\n  nombre_cliente: nombre,\n  texto_mensaje: texto,\n  timestamp: new Date().toISOString()\n}}];"},"id":"node-preparar","name":"Preparar mensaje seguimiento","type":"n8n-nodes-base.code","typeVersion":2,"position":[880,192]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO seguimientos_pendientes (numero_pedido, telefono, nombre_cliente, texto_mensaje, fecha_creacion, enviado) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.texto_mensaje }}', NOW(), 0)","options":{}},"id":"node-guardar","name":"Guardar en cola seguimientos","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1104,192],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}},"notes":"Tu app muestra esta cola con botón Copiar para enviarlo tú por WhatsApp"},{"parameters":{"operation":"executeQuery","query":"UPDATE pedidos SET seguimiento_enviado = 1 WHERE numero_pedido = '{{ $json.numero_pedido }}'","options":{}},"id":"node-marcar","name":"Marcar seguimiento procesado","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1328,192],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('seguimiento_postventa', CONCAT('📬 Seguimiento pendiente de enviar a ', '{{ $(\"Preparar mensaje seguimiento\").json.nombre_cliente }}', ' - Pedido ', '{{ $(\"Preparar mensaje seguimiento\").json.numero_pedido }}'), NOW(), 0)","options":{}},"id":"node-notif","name":"Notificación en Mega Gestor","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1552,192],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"jsCode":"return [{ json: { info: 'Sin pedidos para seguimiento en este ciclo' } }];"},"id":"node-nada","name":"Sin pedidos pendientes","type":"n8n-nodes-base.code","typeVersion":2,"position":[880,432]}],"connections":{"Revisar cada 4 horas":{"main":[[{"node":"Buscar pedidos para seguimiento","type":"main","index":0}]]},"Buscar pedidos para seguimiento":{"main":[[{"node":"¿Hay pedidos?","type":"main","index":0}]]},"¿Hay pedidos?":{"main":[[{"node":"Preparar mensaje seguimiento","type":"main","index":0}],[{"node":"Sin pedidos pendientes","type":"main","index":0}]]},"Preparar mensaje seguimiento":{"main":[[{"node":"Guardar en cola seguimientos","type":"main","index":0}]]},"Guardar en cola seguimientos":{"main":[[{"node":"Marcar seguimiento procesado","type":"main","index":0}]]},"Marcar seguimiento procesado":{"main":[[{"node":"Notificación en Mega Gestor","type":"main","index":0}]]},"[POST-VENTA] Revisar cada 4 horas":{"main":[[{"node":"Buscar pedidos para seguimiento","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":{"node:[POST-VENTA] Revisar cada 4 horas":{"recurrenceRules":[4]}},"meta":null,"pinData":{},"versionId":"9e6ed5d4-62d1-4ee5-bda6-f05316d35afe","activeVersionId":"9e6ed5d4-62d1-4ee5-bda6-f05316d35afe","versionCounter":10,"triggerCount":1,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:38.193Z","createdAt":"2026-05-06T21:31:38.193Z","role":"workflow:owner","workflowId":"2906f52b-1085-4d","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version 9e6ed5d4","description":""}},{"updatedAt":"2026-05-06T21:31:42.418Z","createdAt":"2026-05-06T21:31:42.418Z","id":"f7887468-e676-4d","name":"04 - Alertas Stock + Resumen Diario","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"cronExpression","expression":"0 9,14,19 * * *"}]}},"id":"node-trigger-stock","name":"Revisar stock (9h, 14h, 19h)","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[200,200]},{"parameters":{"rule":{"interval":[{"field":"cronExpression","expression":"0 20 * * *"}]}},"id":"node-trigger-resumen","name":"Resumen ventas a las 20h","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[200,480]},{"parameters":{"operation":"executeQuery","query":"SELECT SKU_REF as referencia, NOMBRE as nombre, STOCK_FISICO as stock, stock_minimo FROM productos WHERE STOCK_FISICO <= stock_minimo AND alerta_stock_enviada = 0","options":{}},"id":"node-stock-bajo","name":"Artículos con stock bajo","type":"n8n-nodes-base.mySql","typeVersion":1,"position":[420,200],"credentials":{"mySql":{"id":"MI_CRED_MYSQL","name":"Noxertez MySQL"}}},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.referencia }}","rightValue":"","operator":{"type":"string","operation":"notEquals"}}]}},"id":"node-hay-stock","name":"¿Stock bajo?","type":"n8n-nodes-base.if","typeVersion":2,"position":[640,200]},{"parameters":{"jsCode":"const items = $input.all();\nlet alerta = 'ALERTA STOCK BAJO - ' + new Date().toLocaleString('es-ES') + '\\n\\n';\nfor (const item of items) {\n  alerta += `- ${item.json.nombre} (${item.json.referencia}): ${item.json.stock} uds (min: ${item.json.stock_minimo})\\n`;\n}\nreturn [{ json: { texto_alerta: alerta, referencias: items.map(i => i.json.referencia) } }];"},"id":"node-crear-alerta","name":"Crear texto alerta","type":"n8n-nodes-base.code","typeVersion":2,"position":[860,120]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('stock_bajo', '{{ $json.texto_alerta }}', NOW(), 0)","options":{}},"id":"node-guardar-alerta","name":"Guardar alerta en app","type":"n8n-nodes-base.mySql","typeVersion":1,"position":[1080,120],"credentials":{"mySql":{"id":"MI_CRED_MYSQL","name":"Noxertez MySQL"}},"notes":"Tu app Noxertez lee esta tabla y muestra las alertas con una campana de notificación"},{"parameters":{"operation":"executeQuery","query":"UPDATE productos SET alerta_stock_enviada = 1 WHERE SKU_REF IN ('{{ $('Crear texto alerta').first().json.referencias.join(\"', '\") }}')","options":{}},"id":"node-marcar-alerta","name":"Marcar alerta enviada","type":"n8n-nodes-base.mySql","typeVersion":1,"position":[1300,120],"credentials":{"mySql":{"id":"MI_CRED_MYSQL","name":"Noxertez MySQL"}}},{"parameters":{"operation":"executeQuery","query":"SELECT COUNT(*) as total_pedidos, COALESCE(SUM(total), 0) as facturado, COUNT(DISTINCT telefono) as clientes FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'","options":{}},"id":"node-stats","name":"Stats del día","type":"n8n-nodes-base.mySql","typeVersion":1,"position":[420,480],"credentials":{"mySql":{"id":"MI_CRED_MYSQL","name":"Noxertez MySQL"}}},{"parameters":{"operation":"executeQuery","query":"SELECT items_json FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'","options":{}},"id":"node-items-dia","name":"Items vendidos hoy","type":"n8n-nodes-base.mySql","typeVersion":1,"position":[640,480],"credentials":{"mySql":{"id":"MI_CRED_MYSQL","name":"Noxertez MySQL"}}},{"parameters":{"jsCode":"const stats = $('Stats del día').first().json;\nconst pedidos = $('Items vendidos hoy').all();\n\nconst conteo = {};\nfor (const p of pedidos) {\n  try {\n    const items = JSON.parse(p.json.items_json || '[]');\n    for (const item of items) {\n      const key = item.nombre || item.referencia || 'Desconocido';\n      conteo[key] = (conteo[key] || 0) + (item.cantidad || 1);\n    }\n  } catch(e) {}\n}\n\nconst top = Object.entries(conteo).sort((a,b) => b[1]-a[1]).slice(0,5);\nconst fecha = new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });\n\nlet resumen = `RESUMEN DEL DIA - ${fecha}\\n`;\nresumen += `Pedidos: ${stats.total_pedidos || 0}\\n`;\nresumen += `Facturado: ${(stats.facturado || 0).toFixed(2)} EUR\\n`;\nresumen += `Clientes: ${stats.clientes || 0}\\n`;\nif (top.length > 0) {\n  resumen += `\\nMas vendidos:\\n`;\n  top.forEach(([nombre, qty]) => { resumen += `  - ${nombre}: ${qty} uds\\n`; });\n}\n\nreturn [{ json: { resumen } }];"},"id":"node-crear-resumen","name":"Crear resumen del día","type":"n8n-nodes-base.code","typeVersion":2,"position":[860,480]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('resumen_diario', '{{ $json.resumen }}', NOW(), 0)","options":{}},"id":"node-guardar-resumen","name":"Guardar resumen en app","type":"n8n-nodes-base.mySql","typeVersion":1,"position":[1080,480],"credentials":{"mySql":{"id":"MI_CRED_MYSQL","name":"Noxertez MySQL"}}}],"connections":{"Revisar stock (9h, 14h, 19h)":{"main":[[{"node":"Artículos con stock bajo","type":"main","index":0}]]},"Artículos con stock bajo":{"main":[[{"node":"¿Stock bajo?","type":"main","index":0}]]},"¿Stock bajo?":{"main":[[{"node":"Crear texto alerta","type":"main","index":0}],[]]},"Crear texto alerta":{"main":[[{"node":"Guardar alerta en app","type":"main","index":0}]]},"Guardar alerta en app":{"main":[[{"node":"Marcar alerta enviada","type":"main","index":0}]]},"Resumen ventas a las 20h":{"main":[[{"node":"Stats del día","type":"main","index":0}]]},"Stats del día":{"main":[[{"node":"Items vendidos hoy","type":"main","index":0}]]},"Items vendidos hoy":{"main":[[{"node":"Crear resumen del día","type":"main","index":0}]]},"Crear resumen del día":{"main":[[{"node":"Guardar resumen en app","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":{"node:Revisar stock (9h, 14h, 19h)":{"recurrenceRules":[]},"node:Resumen ventas a las 20h":{"recurrenceRules":[]}},"meta":null,"pinData":null,"versionId":"39ce9f6e-60f8-439f-a768-cab57e3783c7","activeVersionId":"39ce9f6e-60f8-439f-a768-cab57e3783c7","versionCounter":6,"triggerCount":2,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:42.420Z","createdAt":"2026-05-06T21:31:42.420Z","role":"workflow:owner","workflowId":"f7887468-e676-4d","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version 39ce9f6e","description":""}},{"updatedAt":"2026-05-07T01:46:00.000Z","createdAt":"2026-05-06T21:31:46.725Z","id":"6d2db2de-afef-46","name":"05 - Asistente por Voz (General)","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"httpMethod":"POST","path":"asistente-general","responseMode":"lastNode"},"id":"node-webhook","name":"Webhook Asistente","type":"n8n-nodes-base.webhook","typeVersion":1,"position":[100,300]},{"parameters":{"jsCode":"// CAPTURA ROBUSTA\nconst body = $input.first().json.body || $input.first().json;\nconst texto = (body.texto || body.message || body.query || '').toLowerCase().trim();\n\nif (!texto || texto.length < 2) {\n  return [{ json: { accion: 'error', respuesta: 'No recibí texto claro.', datos: null } }];\n}\n\nlet accion = 'no_entendido';\nlet respuesta = 'No entendí el comando.';\n\nif (texto.match(/pedido|pedidos|cu[aá]ntos hay|preparar/)) {\n  accion = 'consultar_pedidos';\n  respuesta = 'Consultando pedidos...';\n} else if (texto.match(/qu[eé] hay que hacer|tareas|pendiente|qu[eé] tengo|hoy que|hacer hoy/)) {\n  accion = 'consultar_tareas';\n  respuesta = 'Consultando tus tareas...';\n} else if (texto.match(/resumen|c[oó]mo ha ido|ventas|hoy|d[ií]a/)) {\n  accion = 'resumen_dia';\n  respuesta = 'Preparando el resumen de hoy...';\n} else {\n  respuesta = `No reconocí: \"${texto}\". Prueba con: Pedidos pendientes, Tareas de hoy o Resumen del día.`;\n}\n\nreturn [{ json: { accion, respuesta, texto_original: texto } }];"},"id":"node-interpretar","name":"Interpretar","type":"n8n-nodes-base.code","typeVersion":2,"position":[300,300]},{"parameters":{"rules":{"values":[{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.accion }}","rightValue":"consultar_pedidos","operator":{"type":"string","operation":"equals"}}]}},{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.accion }}","rightValue":"consultar_tareas","operator":{"type":"string","operation":"equals"}}]}},{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.accion }}","rightValue":"resumen_dia","operator":{"type":"string","operation":"equals"}}]}}]}},"id":"node-switch","name":"Switch","type":"n8n-nodes-base.switch","typeVersion":3,"position":[500,300]},{"parameters":{"operation":"executeQuery","query":"SELECT numero_pedido, nombre_cliente FROM pedidos WHERE estado = 'pendiente' LIMIT 5","options":{}},"id":"node-pedidos","name":"MySQL_Pedidos","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[750,150],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"SELECT descripcion FROM tareas WHERE completada = 0 LIMIT 5","options":{}},"id":"node-tareas","name":"MySQL_Tareas","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[750,300],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"SELECT COUNT(*) as total FROM pedidos WHERE DATE(fecha_pedido) = CURDATE()","options":{}},"id":"node-resumen","name":"MySQL_Resumen","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[750,450],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"jsCode":"const data = $input.all(); const prev = $('Interpretar').first().json; let res = ''; if (prev.accion === 'consultar_pedidos') { res = `Tienes ${data.length} pedidos pendientes.`; } else if (prev.accion === 'consultar_tareas') { res = `Tienes ${data.length} tareas para hoy.`; } else if (prev.accion === 'resumen_dia') { res = `Hoy llevas ${data[0]?.json?.total || 0} pedidos.`; } else { res = prev.respuesta; } return [{ json: { respuesta: res, accion: prev.accion } }];"},"id":"node-builder","name":"Builder","type":"n8n-nodes-base.code","typeVersion":2,"position":[1000,300]},{"parameters":{"respondWith":"json","responseBody":"={{ JSON.stringify($json) }}"},"id":"node-responder","name":"Responder","type":"n8n-nodes-base.respondToWebhook","typeVersion":1,"position":[1200,300]}],"connections":{"Webhook Asistente":{"main":[[{"node":"Interpretar","type":"main","index":0}]]},"Interpretar":{"main":[[{"node":"Switch","type":"main","index":0}]]},"Switch":{"main":[[{"node":"MySQL_Pedidos","type":"main","index":0}],[{"node":"MySQL_Tareas","type":"main","index":0}],[{"node":"MySQL_Resumen","type":"main","index":0}]]},"MySQL_Pedidos":{"main":[[{"node":"Builder","type":"main","index":0}]]},"MySQL_Tareas":{"main":[[{"node":"Builder","type":"main","index":0}]]},"MySQL_Resumen":{"main":[[{"node":"Builder","type":"main","index":0}]]},"Builder":{"main":[[{"node":"Responder","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":{},"versionId":"f36da1ac-16b5-4258-835a-ddc60b90c358","activeVersionId":"f36da1ac-16b5-4258-835a-ddc60b90c358","versionCounter":20,"triggerCount":1,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:46.729Z","createdAt":"2026-05-06T21:31:46.729Z","role":"workflow:owner","workflowId":"6d2db2de-afef-46","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version f36da1ac","description":""}},{"updatedAt":"2026-05-06T21:31:51.108Z","createdAt":"2026-05-06T21:31:51.108Z","id":"53d429fa-bc39-48","name":"06 - Correo a Pedido (Anti-spam + Anti-bucle)","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"content":"### 📦 GESTIÓN DE PEDIDOS\nEste flujo monitoriza correos entrantes y los guarda como BORRADORES en el CMS.\n\n**Emails aceptados:** pedidos@noxertez.com","height":160,"width":300},"id":"sticky-pedidos","name":"Sticky Note","type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[0,0]},{"parameters":{"pollTimes":{"item":[{"mode":"everyMinute"}]},"mailbox":"INBOX","options":{"allowUnauthorizedCerts":false},"postProcessAction":"read"},"id":"node-imap","name":"[PEDIDOS] Nuevo Correo IMAP","type":"n8n-nodes-base.emailReadImap","typeVersion":2,"position":[200,300],"credentials":{"imap":{"id":"","name":"IMAP account"}}},{"parameters":{"jsCode":"const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\nconst cuerpo = (email.text || email.html || '').toLowerCase();\n\n// === FILTRO ANTI-BUCLE: ignorar correos de noxertez ===\nconst esPropio = de.includes('noxertez@gmail.com') || \n                 de.includes('@noxertez.com') ||\n                 de.includes('mailer-daemon') ||\n                 de.includes('postmaster');\n\n// === FILTRO ANTI-SPAM ===\nconst dominiosSpam = [\n  'wallapop', 'vinted', 'milanuncios', 'vibbo', 'todocoleccion',\n  'noreply', 'no-reply', 'donotreply', 'do-not-reply',\n  'newsletter', 'notification', 'notifications', 'marketing',\n  'support@', 'hello@', 'team@', 'news@',\n  'mailchimp', 'sendgrid', 'mailjet', 'brevo', 'sendinblue',\n  'google.com', 'facebook.com', 'instagram.com', 'twitter.com',\n  'linkedin.com', 'amazon.com', 'ebay.com'\n];\nconst esSpam = dominiosSpam.some(d => de.includes(d));\n\n// === FILTRO ASUNTO SPAM ===\nconst asuntosSpam = [\n  'unsubscribe', 'darse de baja', 'newsletter', 'oferta especial',\n  'promocion', 'descuento', 'publicidad', 'notificacion automatica',\n  'do not reply', 'automatic reply', 'out of office', 'fuera de oficina'\n];\nconst asuntoEsSpam = asuntosSpam.some(a => asunto.includes(a));\n\n// === DETECTAR A QUÉ CORREO FUE ENVIADO ===\nlet tipoPedido = 'desconocido';\nif (para.includes('pedidos@noxertez.com')) tipoPedido = 'pedido_directo';\nelse if (para.includes('info@noxertez.com')) tipoPedido = 'info_general';\nelse if (para.includes('influencer@noxertez.com')) tipoPedido = 'influencer';\nelse if (para.includes('ayuda@noxertez.com')) tipoPedido = 'soporte';\nelse if (para.includes('noxertez@gmail.com')) tipoPedido = 'gmail_directo';\n\n// === RESULTADO ===\nconst ignorar = esPropio || esSpam || asuntoEsSpam;\n\nreturn [{ json: {\n  ignorar,\n  motivo_ignorar: esPropio ? 'correo_propio' : esSpam ? 'spam_remitente' : asuntoEsSpam ? 'spam_asunto' : null,\n  tipo: tipoPedido,\n  de: email.from || '',\n  para: email.to || '',\n  asunto: email.subject || '',\n  cuerpo_raw: (email.text || '').substring(0, 500),\n  fecha: new Date().toISOString()\n}}];"},"id":"node-filtrar","name":"Filtrar spam y bucles","type":"n8n-nodes-base.code","typeVersion":2,"position":[420,300]},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.ignorar }}","rightValue":true,"operator":{"type":"boolean","operation":"true"}}]}},"id":"node-es-spam","name":"¿Es spam o bucle?","type":"n8n-nodes-base.if","typeVersion":2,"position":[640,300]},{"parameters":{"jsCode":"// Correo ignorado, no hacer nada\nreturn [{ json: { info: 'Correo ignorado: ' + $input.first().json.motivo_ignorar } }];"},"id":"node-ignorar","name":"Ignorar silenciosamente","type":"n8n-nodes-base.code","typeVersion":2,"position":[860,180]},{"parameters":{"jsCode":"const d = $input.first().json;\n\n// Extraer nombre del remitente\nconst deRaw = d.de || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nif (!nombre) nombre = 'Cliente sin nombre';\n\n// Extraer teléfono si aparece en el cuerpo\nconst telMatch = d.cuerpo_raw.match(/(?:\\+34|0034)?\\s*[6789]\\d{8}/);\nconst telefono = telMatch ? telMatch[0].replace(/\\s/g, '') : '';\n\n// Número de pedido único\nconst numero_pedido = 'EMAIL-' + Date.now();\n\n// Preparar items básicos (el cuerpo libre sin parsear)\nconst items = [{ \n  referencia: 'PENDIENTE', \n  nombre: 'Ver correo - completar manualmente', \n  cantidad: 1, \n  precio_unit: 0, \n  subtotal: 0 \n}];\n\n// Etiqueta según tipo\nconst etiquetas = {\n  'pedido_directo': '📦 PEDIDO',\n  'info_general': 'ℹ️ CONSULTA',\n  'influencer': '🌟 INFLUENCER',\n  'soporte': '🆘 AYUDA',\n  'gmail_directo': '📧 GMAIL',\n  'desconocido': '❓ REVISAR'\n};\nconst etiqueta = etiquetas[d.tipo] || '❓ REVISAR';\n\nreturn [{ json: {\n  numero_pedido,\n  nombre_cliente: nombre,\n  email_cliente: deRaw,\n  telefono,\n  tipo: d.tipo,\n  etiqueta,\n  items_json: JSON.stringify(items),\n  notas: `${etiqueta} | Asunto: ${d.asunto} | De: ${deRaw} | Mensaje: ${d.cuerpo_raw}`,\n  fecha_pedido: d.fecha\n}}];"},"id":"node-preparar","name":"Preparar datos correo","type":"n8n-nodes-base.code","typeVersion":2,"position":[860,420]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO pedidos (numero_pedido, nombre_cliente, telefono, items_json, total, estado, canal, notas, fecha_pedido) VALUES ('{{ $json.numero_pedido }}', '{{ $json.nombre_cliente }}', '{{ $json.telefono }}', '{{ $json.items_json }}', 0, 'borrador', 'email', '{{ $json.notas }}', '{{ $json.fecha_pedido }}')","options":{}},"id":"node-guardar","name":"Guardar como BORRADOR","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1080,420],"credentials":{"mySql":{"id":"","name":"MySQL account"}},"notes":"Estado BORRADOR: aparece en tu app para que lo completes manualmente"},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('correo_pedido', CONCAT('{{ $json.etiqueta }}', ' por email de ', '{{ $json.nombre_cliente }}', ' | ', '{{ $json.numero_pedido }}'), NOW(), 0)","options":{}},"id":"node-notif","name":"Notificación en Mega Gestor","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1300,420],"credentials":{"mySql":{"id":"","name":"MySQL account"}}}],"connections":{"[PEDIDOS] Nuevo Correo IMAP":{"main":[[{"node":"Filtrar spam y bucles","type":"main","index":0}]]},"Filtrar spam y bucles":{"main":[[{"node":"¿Es spam o bucle?","type":"main","index":0}]]},"¿Es spam o bucle?":{"main":[[{"node":"Ignorar silenciosamente","type":"main","index":0}],[{"node":"Preparar datos correo","type":"main","index":0}]]},"Preparar datos correo":{"main":[[{"node":"Guardar como BORRADOR","type":"main","index":0}]]},"Guardar como BORRADOR":{"main":[[{"node":"Notificación en Mega Gestor","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":null,"versionId":"efe6360b-e74c-4792-8467-500e06ae896f","activeVersionId":null,"versionCounter":1,"triggerCount":0,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:51.110Z","createdAt":"2026-05-06T21:31:51.110Z","role":"workflow:owner","workflowId":"53d429fa-bc39-48","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":null,"description":null}},{"updatedAt":"2026-05-06T21:31:55.342Z","createdAt":"2026-05-06T21:31:55.342Z","id":"d3f79c0d-6014-44","name":"07 - Correo Influencer a BD Noxertez","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"content":"### 🌟 GESTIÓN DE INFLUENCERS\nEste flujo detecta propuestas de influencers y los registra en la base de datos.\n\n**Emails aceptados:** influencer@noxertez.com","height":160,"width":300},"id":"sticky-influencers","name":"Sticky Note","type":"n8n-nodes-base.stickyNote","typeVersion":1,"position":[0,0]},{"parameters":{"pollTimes":{"item":[{"mode":"everyMinute"}]},"mailbox":"INBOX","options":{"allowUnauthorizedCerts":false},"postProcessAction":"read","filters":{"sender":""}},"id":"node-imap","name":"[INFLUENCERS] Nuevo Correo IMAP","type":"n8n-nodes-base.emailReadImap","typeVersion":2,"position":[200,300],"credentials":{"imap":{"id":"","name":"IMAP account"}}},{"parameters":{"jsCode":"const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\n\n// Solo procesar correos a influencer@noxertez.com\nconst esParaInfluencer = para.includes('influencer@noxertez.com');\n\n// Anti-bucle y anti-spam (Relajado para permitir pruebas)\nconst esPropio = de.includes('mailer-daemon') || de.includes('postmaster') || de.includes('noreply') || de.includes('no-reply');\nconst esSpam = ['newsletter','marketing','notification','publicidad','unsubscribe'].some(s => asunto.includes(s) || de.includes(s));\n\nif (!esParaInfluencer || esPropio || esSpam) {\n  return [{ json: { ignorar: true, motivo: !esParaInfluencer ? 'no_es_influencer' : esPropio ? 'correo_sistema' : 'spam' } }];\n}\n\n// Extraer datos del remitente\nconst deRaw = email.from || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nif (!nombre || nombre.length < 2) nombre = deRaw.split('@')[0];\n\nconst emailCliente = deRaw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\nconst emailLimpio = emailCliente ? emailCliente[0] : deRaw;\n\nconst cuerpo = (email.text || email.html || '').substring(0, 800);\n\n// Intentar detectar red social e @usuario mencionados en el cuerpo\nconst igMatch = cuerpo.match(/@([a-zA-Z0-9._]{2,30})/);\nconst usuarioIG = igMatch ? igMatch[1] : '';\n\nconst redSocial = cuerpo.toLowerCase().includes('tiktok') ? 'TikTok' :\n                  cuerpo.toLowerCase().includes('youtube') ? 'YouTube' :\n                  cuerpo.toLowerCase().includes('instagram') ? 'Instagram' : 'Instagram';\n\n// Intentar detectar seguidores mencionados\nconst segMatch = cuerpo.match(/(\\d[\\d.,]+)\\s*(?:seguidores|followers|subs)/i);\nlet seguidores = 0;\nif (segMatch) {\n  seguidores = parseInt(segMatch[1].replace(/[.,]/g, ''));\n}\n\nreturn [{ json: {\n  ignorar: false,\n  nombre,\n  email: emailLimpio,\n  red_social: redSocial,\n  usuario_ig: usuarioIG,\n  seguidores,\n  nicho: '',\n  vibe_estilo: '',\n  likes_promedio: 0,\n  activo: 1,\n  notas_contacto: `Asunto: ${email.subject || ''} | Mensaje: ${cuerpo.substring(0, 300)}`,\n  fecha: new Date().toISOString()\n}}];"},"id":"node-filtrar","name":"Filtrar y extraer datos influencer","type":"n8n-nodes-base.code","typeVersion":2,"position":[420,300]},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.ignorar }}","rightValue":true,"operator":{"type":"boolean","operation":"true"}}]}},"id":"node-check","name":"¿Ignorar?","type":"n8n-nodes-base.if","typeVersion":2,"position":[640,300]},{"parameters":{"jsCode":"return [{ json: { info: 'Correo ignorado: ' + $input.first().json.motivo } }];"},"id":"node-ignorar","name":"Ignorar","type":"n8n-nodes-base.code","typeVersion":2,"position":[860,180]},{"parameters":{"operation":"executeQuery","query":"SELECT id FROM influencers WHERE email = '{{ $json.email }}' LIMIT 1","options":{}},"id":"node-check-existe","name":"¿Ya existe este influencer?","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[860,420],"credentials":{"mySql":{"id":"","name":"MySQL account"}}},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.id }}","rightValue":"","operator":{"type":"string","operation":"notExists"}}]}},"id":"node-es-nuevo","name":"¿Es nuevo?","type":"n8n-nodes-base.if","typeVersion":2,"position":[1080,420]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO influencers (nombre, red_social, usuario_ig, seguidores, email, telefono, vibe_estilo, nicho, likes_promedio, activo) VALUES ('{{ $('Filtrar y extraer datos influencer').first().json.nombre }}', '{{ $('Filtrar y extraer datos influencer').first().json.red_social }}', '{{ $('Filtrar y extraer datos influencer').first().json.usuario_ig }}', {{ $('Filtrar y extraer datos influencer').first().json.seguidores }}, '{{ $('Filtrar y extraer datos influencer').first().json.email }}', '', '', '', 0, 1)","options":{}},"id":"node-insertar","name":"Crear influencer en BD","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1300,320],"credentials":{"mySql":{"id":"","name":"MySQL account"}},"notes":"Inserta el influencer con los datos básicos extraídos del correo. Completa el resto en la app."},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('influencer_nuevo', CONCAT('🌟 Nuevo influencer por email: ', '{{ $('Filtrar y extraer datos influencer').first().json.nombre }}', ' (', '{{ $('Filtrar y extraer datos influencer').first().json.email }}', ')'), NOW(), 0)","options":{}},"id":"node-notif-nuevo","name":"Notificación influencer nuevo","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1520,320],"credentials":{"mySql":{"id":"","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('influencer_repetido', CONCAT('🌟 Correo de influencer ya registrado: ', '{{ $('Filtrar y extraer datos influencer').first().json.nombre }}', ' | ', '{{ $('Filtrar y extraer datos influencer').first().json.notas_contacto }}'), NOW(), 0)","options":{}},"id":"node-notif-existe","name":"Notificación influencer existente","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1300,540],"credentials":{"mySql":{"id":"","name":"MySQL account"}}}],"connections":{"[INFLUENCERS] Nuevo Correo IMAP":{"main":[[{"node":"Filtrar y extraer datos influencer","type":"main","index":0}]]},"Filtrar y extraer datos influencer":{"main":[[{"node":"¿Ignorar?","type":"main","index":0}]]},"¿Ignorar?":{"main":[[{"node":"Ignorar","type":"main","index":0}],[{"node":"¿Ya existe este influencer?","type":"main","index":0}]]},"¿Ya existe este influencer?":{"main":[[{"node":"¿Es nuevo?","type":"main","index":0}]]},"¿Es nuevo?":{"main":[[{"node":"Crear influencer en BD","type":"main","index":0}],[{"node":"Notificación influencer existente","type":"main","index":0}]]},"Crear influencer en BD":{"main":[[{"node":"Notificación influencer nuevo","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":null,"versionId":"42d2db75-20b8-40bb-b199-4880a74ac616","activeVersionId":null,"versionCounter":1,"triggerCount":0,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:55.345Z","createdAt":"2026-05-06T21:31:55.345Z","role":"workflow:owner","workflowId":"d3f79c0d-6014-44","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":null,"description":null}},{"updatedAt":"2026-05-06T21:31:59.574Z","createdAt":"2026-05-06T21:31:59.574Z","id":"435ec350-1a0f-46","name":"08 - Correo Info y Ayuda a Mega Gestor","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"pollTimes":{"item":[{"mode":"everyMinute"}]},"mailbox":"INBOX","options":{"allowUnauthorizedCerts":false},"postProcessAction":"read"},"id":"node-imap","name":"Nuevo Correo IMAP","type":"n8n-nodes-base.emailReadImap","typeVersion":2,"position":[200,300],"credentials":{"imap":{"id":"","name":"IMAP account"}}},{"parameters":{"jsCode":"const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\n\n// Solo procesar info@ y ayuda@\nconst esParaInfo = para.includes('info@noxertez.com');\nconst esParaAyuda = para.includes('ayuda@noxertez.com');\n\n// Anti-bucle y anti-spam\nconst esPropio = de.includes('noxertez@gmail.com') || de.includes('@noxertez.com') || de.includes('mailer-daemon') || de.includes('noreply') || de.includes('no-reply');\nconst esSpam = ['newsletter','marketing','notification','publicidad','unsubscribe','wallapop','vinted'].some(s => asunto.includes(s) || de.includes(s));\n\nif ((!esParaInfo && !esParaAyuda) || esPropio || esSpam) {\n  return [{ json: { ignorar: true } }];\n}\n\n// Extraer remitente\nconst deRaw = email.from || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nconst emailMatch = deRaw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\nconst emailLimpio = emailMatch ? emailMatch[0] : deRaw;\n\nconst tipo = esParaAyuda ? 'ayuda' : 'info';\nconst emoji = esParaAyuda ? '🆘' : 'ℹ️';\nconst cuerpo = (email.text || '').substring(0, 400);\n\nreturn [{ json: {\n  ignorar: false,\n  tipo,\n  emoji,\n  nombre,\n  email: emailLimpio,\n  asunto: email.subject || '(sin asunto)',\n  cuerpo,\n  fecha: new Date().toISOString()\n}}];"},"id":"node-filtrar","name":"Filtrar y clasificar","type":"n8n-nodes-base.code","typeVersion":2,"position":[420,300]},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.ignorar }}","rightValue":true,"operator":{"type":"boolean","operation":"true"}}]}},"id":"node-check","name":"¿Ignorar?","type":"n8n-nodes-base.if","typeVersion":2,"position":[640,300]},{"parameters":{"jsCode":"return [{ json: { info: 'Ignorado' } }];"},"id":"node-ignorar","name":"Ignorar","type":"n8n-nodes-base.code","typeVersion":2,"position":[860,180]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('correo_{{ $json.tipo }}', CONCAT('{{ $json.emoji }}', ' Correo ', UPPER('{{ $json.tipo }}'), ': ', '{{ $json.nombre }}', ' (', '{{ $json.email }}', ') | Asunto: ', '{{ $json.asunto }}', ' | ', '{{ $json.cuerpo }}'), NOW(), 0)","options":{}},"id":"node-notif","name":"Crear notificación en Mega Gestor","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[860,420],"credentials":{"mySql":{"id":"","name":"MySQL account"}},"notes":"Aparece en el panel de notificaciones del Mega Gestor para que respondas manualmente"}],"connections":{"Nuevo Correo IMAP":{"main":[[{"node":"Filtrar y clasificar","type":"main","index":0}]]},"Filtrar y clasificar":{"main":[[{"node":"¿Ignorar?","type":"main","index":0}]]},"¿Ignorar?":{"main":[[{"node":"Ignorar","type":"main","index":0}],[{"node":"Crear notificación en Mega Gestor","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":null,"versionId":"a7125044-67ed-4425-af3e-b58c15a10a12","activeVersionId":null,"versionCounter":1,"triggerCount":0,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:31:59.577Z","createdAt":"2026-05-06T21:31:59.577Z","role":"workflow:owner","workflowId":"435ec350-1a0f-46","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":null,"description":null}},{"updatedAt":"2026-05-06T21:32:03.880Z","createdAt":"2026-05-06T21:32:03.880Z","id":"47449235-a9bd-43","name":"09 - Instagram Auto-Post desde Mockups","description":null,"active":false,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"field":"cronExpression","expression":"0 9,15,21 * * *"}]}},"id":"node-trigger","name":"Publicar 3 veces al día (9h, 15h, 21h)","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[200,300],"notes":"Publica 1 mockup en Instagram a las 9h, 15h y 21h"},{"parameters":{"operation":"executeQuery","query":"SELECT m.id, m.ruta, m.archivo, m.estancia, m.estilo, m.decoracion, m.formato, m.marca_noxertez, m.marca_candleholder, m.marca_zen, a.nombre as nombre_producto, a.descripcion as desc_producto, a.categoria FROM mockups_varios m LEFT JOIN mockups_vinculaciones mv ON mv.mockup_id = m.id LEFT JOIN articulos a ON mv.sku = a.referencia WHERE m.publicado_instagram IS NULL ORDER BY m.veces_usado ASC, RAND() LIMIT 1","options":{}},"id":"node-buscar-mockup","name":"Buscar mockup no publicado en Instagram","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[440,300],"credentials":{"mySql":{"id":"","name":"MySQL account"}},"notes":"Coge el mockup con menos usos que aún no se ha publicado en Instagram"},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.id }}","rightValue":"","operator":{"type":"string","operation":"notEquals"}}]}},"id":"node-hay-mockup","name":"¿Hay mockup disponible?","type":"n8n-nodes-base.if","typeVersion":2,"position":[660,300]},{"parameters":{"jsCode":"const d = $input.first().json;\n\n// Convertir ruta local a URL pública\n// La ruta en DB es tipo: mockups/ARCHIVO.jpg o ruta completa Windows\nlet rutaRaw = d.ruta || d.archivo || '';\nlet imageUrl = '';\n\nif (rutaRaw.startsWith('http')) {\n  imageUrl = rutaRaw;\n} else {\n  // Limpiar ruta Windows y convertir a URL\n  rutaRaw = rutaRaw.replace(/\\\\/g, '/');\n  // Quitar partes de ruta local hasta encontrar 'mockups' o 'imagenes'\n  const partesMockups = rutaRaw.split('mockups/');\n  const partesImagenes = rutaRaw.split('imagenes/');\n  \n  if (partesMockups.length > 1) {\n    imageUrl = 'https://noxertez.com/mockups/' + partesMockups[partesMockups.length - 1];\n  } else if (partesImagenes.length > 1) {\n    imageUrl = 'https://noxertez.com/imagenes/' + partesImagenes[partesImagenes.length - 1];\n  } else {\n    // Último recurso: usar el nombre de archivo directamente\n    const archivo = rutaRaw.split('/').pop().split('\\\\').pop();\n    imageUrl = 'https://noxertez.com/mockups/' + archivo;\n  }\n}\n\n// Detectar marca\nconst marcas = [];\nif (d.marca_noxertez == 1) marcas.push('Noxertez');\nif (d.marca_candleholder == 1) marcas.push('Candleholder');\nif (d.marca_zen == 1) marcas.push('Zen Garden');\nconst marca = marcas[0] || 'Noxertez';\n\n// Datos del mockup\nconst estancia = d.estancia || 'hogar';\nconst estilo = d.estilo || '';\nconst decoracion = d.decoracion || '';\nconst producto = d.nombre_producto || '';\n\n// Hashtags por estancia\nconst hashtagsEstancia = {\n  'salon': '#DecoSalon #LivingRoom #DecoracionSalon',\n  'dormitorio': '#DecoDormitorio #Bedroom #DecoHabitacion',\n  'cocina': '#DecoKitchen #Cocina #CocinaDecoracion',\n  'bano': '#DecoBano #BathroomDecor #Bano',\n  'oficina': '#DecoOficina #HomeOffice #OficinaEnCasa',\n  'exterior': '#DecoExterior #JardinDeco #TerrazaDeco'\n};\nconst htEstancia = hashtagsEstancia[estancia.toLowerCase()] || '#DecoHogar #HomeDecor';\n\n// Generar caption\nconst captions = [\n  `✨ ${producto ? producto + ' en tu ' + estancia : 'Decoración artesanal para tu ' + estancia} 🏠\\n\\nCada pieza de ${marca} está hecha a mano con madera natural. Única e irrepetible. 🪵\\n\\n${htEstancia} #${marca} #MaderaArtesanal #HechoAMano #DecoracionHogar #ArtesaniaEspana`,\n  `🪵 Madera natural. Diseño único. Hogar con alma.\\n\\n${producto ? 'Nuestro ' + producto + ' transforma cualquier ' + estancia + ' en un espacio especial.' : 'Transforma tu ' + estancia + ' con nuestras creaciones artesanales.'}\\n\\n#${marca} #WoodDecor #MaderaDecoracion ${htEstancia} #HandmadeSpain #ArtesaniaEspañola`,\n  `💛 Porque tu hogar merece lo mejor.\\n\\n${producto || 'Decoración artesanal'} para tu ${estancia} — diseñado y fabricado a mano en España. 🌿\\n\\n#${marca} #DecoNatural #MaderaViva ${htEstancia} #EcoDecor #SostenibleYBello`\n];\n\n// Rotar caption según hora del día\nconst hora = new Date().getHours();\nconst idxCaption = hora < 12 ? 0 : hora < 18 ? 1 : 2;\nconst caption = captions[idxCaption];\n\nreturn [{ json: {\n  mockup_id: d.id,\n  image_url: imageUrl,\n  caption,\n  marca,\n  estancia\n}}];"},"id":"node-preparar","name":"Preparar imagen y caption","type":"n8n-nodes-base.code","typeVersion":2,"position":[880,180]},{"parameters":{"method":"POST","url":"=https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ID }}/media","sendQuery":true,"queryParameters":{"parameters":[{"name":"image_url","value":"={{ $json.image_url }}"},{"name":"caption","value":"={{ $json.caption }}"},{"name":"access_token","value":"={{ $vars.INSTAGRAM_ACCESS_TOKEN }}"}]},"options":{"timeout":30000}},"id":"node-crear-container","name":"Crear contenedor Instagram (paso 1)","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[1100,180],"notes":"Sube la imagen a Instagram. Devuelve un container ID."},{"parameters":{"amount":15,"unit":"seconds"},"id":"node-esperar","name":"Esperar 15 segundos","type":"n8n-nodes-base.wait","typeVersion":1,"position":[1320,180],"notes":"Instagram necesita tiempo para procesar la imagen antes de publicar"},{"parameters":{"method":"POST","url":"=https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ID }}/media_publish","sendQuery":true,"queryParameters":{"parameters":[{"name":"creation_id","value":"={{ $('Crear contenedor Instagram (paso 1)').first().json.id }}"},{"name":"access_token","value":"={{ $vars.INSTAGRAM_ACCESS_TOKEN }}"}]},"options":{"timeout":30000}},"id":"node-publicar","name":"Publicar en Instagram (paso 2)","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[1540,180]},{"parameters":{"operation":"executeQuery","query":"UPDATE mockups_varios SET publicado_instagram = NOW(), veces_usado = veces_usado + 1, ultima_vez_usado = NOW() WHERE id = {{ $('Preparar imagen y caption').first().json.mockup_id }}","options":{}},"id":"node-marcar","name":"Marcar mockup publicado en Instagram","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1760,180],"credentials":{"mySql":{"id":"","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('instagram_post', CONCAT('📸 Instagram: mockup publicado - ', '{{ $('Preparar imagen y caption').first().json.estancia }}', ' (ID: ', '{{ $('Preparar imagen y caption').first().json.mockup_id }}', ')'), NOW(), 0)","options":{}},"id":"node-notif","name":"Notificación publicación","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1980,180],"credentials":{"mySql":{"id":"","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('instagram_agotado', '⚠️ Instagram: No quedan mockups sin publicar. Todos ya fueron publicados.', NOW(), 0)","options":{}},"id":"node-agotado","name":"Notificación mockups agotados","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[880,420],"credentials":{"mySql":{"id":"","name":"MySQL account"}},"notes":"Cuando todos los mockups ya se publicaron, avisa para que añadas más"}],"connections":{"Publicar 3 veces al día (9h, 15h, 21h)":{"main":[[{"node":"Buscar mockup no publicado en Instagram","type":"main","index":0}]]},"Buscar mockup no publicado en Instagram":{"main":[[{"node":"¿Hay mockup disponible?","type":"main","index":0}]]},"¿Hay mockup disponible?":{"main":[[{"node":"Preparar imagen y caption","type":"main","index":0}],[{"node":"Notificación mockups agotados","type":"main","index":0}]]},"Preparar imagen y caption":{"main":[[{"node":"Crear contenedor Instagram (paso 1)","type":"main","index":0}]]},"Crear contenedor Instagram (paso 1)":{"main":[[{"node":"Esperar 15 segundos","type":"main","index":0}]]},"Esperar 15 segundos":{"main":[[{"node":"Publicar en Instagram (paso 2)","type":"main","index":0}]]},"Publicar en Instagram (paso 2)":{"main":[[{"node":"Marcar mockup publicado en Instagram","type":"main","index":0}]]},"Marcar mockup publicado en Instagram":{"main":[[{"node":"Notificación publicación","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":null,"meta":null,"pinData":null,"versionId":"97835d56-0ef1-4c9f-928b-8e4c0470e57d","activeVersionId":null,"versionCounter":1,"triggerCount":0,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:32:03.883Z","createdAt":"2026-05-06T21:32:03.883Z","role":"workflow:owner","workflowId":"47449235-a9bd-43","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":null,"description":null}},{"updatedAt":"2026-05-06T22:09:13.362Z","createdAt":"2026-05-06T21:32:08.137Z","id":"3fe04f1f-5365-4e","name":"LinkedIn Publisher Automático - Noxertez","description":null,"active":true,"isArchived":false,"nodes":[{"parameters":{"rule":{"interval":[{"triggerAtHour":12},{"triggerAtHour":18}]}},"id":"node-schedule","name":"Sincronización Web","type":"n8n-nodes-base.scheduleTrigger","typeVersion":1.2,"position":[208,304]},{"parameters":{"url":"http://localhost/noxertez/api/linkedin_publish.php?accion=publish_batch","options":{"timeout":30000}},"id":"node-http","name":"Llamar LinkedIn Publisher","type":"n8n-nodes-base.httpRequest","typeVersion":4.2,"position":[448,304]},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.publicados }}","rightValue":0,"operator":{"type":"number","operation":"gt"}}]},"options":{}},"id":"node-check-publicados","name":"¿Se publicó algo?","type":"n8n-nodes-base.if","typeVersion":2,"position":[672,304]},{"parameters":{"conditions":{"options":{},"conditions":[{"leftValue":"={{ $json.errores.length }}","rightValue":0,"operator":{"type":"number","operation":"gt"}}]},"options":{}},"id":"node-check-errores","name":"¿Hay errores?","type":"n8n-nodes-base.if","typeVersion":2,"position":[880,432]},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('linkedin_ok', CONCAT('LinkedIn: ', '{{ $json.publicados }}', ' post(s) publicados correctamente'), NOW(), 0)","options":{}},"id":"node-notif-ok","name":"Notificación éxito","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[880,192],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"operation":"executeQuery","query":"INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('linkedin_error', CONCAT('ERROR LinkedIn: ', '{{ JSON.stringify($json.errores) }}'), NOW(), 0)","options":{}},"id":"node-notif-error","name":"Notificación error","type":"n8n-nodes-base.mySql","typeVersion":2,"position":[1104,368],"credentials":{"mySql":{"id":"5zs1WElUjUKf6I5G","name":"MySQL account"}}},{"parameters":{"jsCode":"return [{ json: { info: 'Sin posts pendientes en este ciclo' } }];"},"id":"node-nada","name":"Sin posts pendientes","type":"n8n-nodes-base.code","typeVersion":2,"position":[1104,512]}],"connections":{"Cada 6 horas":{"main":[[{"node":"Llamar LinkedIn Publisher","type":"main","index":0}]]},"Llamar LinkedIn Publisher":{"main":[[{"node":"¿Se publicó algo?","type":"main","index":0}]]},"¿Se publicó algo?":{"main":[[{"node":"Notificación éxito","type":"main","index":0}],[{"node":"¿Hay errores?","type":"main","index":0}]]},"¿Hay errores?":{"main":[[{"node":"Notificación error","type":"main","index":0}],[{"node":"Sin posts pendientes","type":"main","index":0}]]},"Sincronización Web":{"main":[[{"node":"Llamar LinkedIn Publisher","type":"main","index":0}]]}},"settings":{"executionOrder":"v1"},"staticData":{"node:Sincronización Web":{"recurrenceRules":[]}},"meta":null,"pinData":{},"versionId":"b03557c3-e0f6-4d00-9bd1-bef850678bd0","activeVersionId":"b03557c3-e0f6-4d00-9bd1-bef850678bd0","versionCounter":7,"triggerCount":1,"tags":[],"shared":[{"updatedAt":"2026-05-06T21:32:08.140Z","createdAt":"2026-05-06T21:32:08.140Z","role":"workflow:owner","workflowId":"3fe04f1f-5365-4e","projectId":"7qBa8daKm985dNpE","project":{"updatedAt":"2026-05-06T21:23:01.681Z","createdAt":"2026-05-06T21:10:29.380Z","id":"7qBa8daKm985dNpE","name":"noxertez noxertez <noxertez@gmail.com>","type":"personal","icon":null,"description":null,"creatorId":"11bcd377-76de-422c-8591-bb365f6fbe7b"}}],"versionMetadata":{"name":"Version b03557c3","description":""}}]
+[
+  {
+    "updatedAt": "2026-05-07T01:45:00.000Z",
+    "createdAt": "2026-05-06T21:10:59.291Z",
+    "id": "n2ZQ2yhnmTY2zcxZ",
+    "name": "Asistente_Voz_PRO",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "asistente-pro",
+          "responseMode": "lastNode"
+        },
+        "name": "Webhook_Asistente",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          100,
+          200
+        ],
+        "id": "ef20585d-ebcb-4673-b448-2fdcf9904670"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body || $input.first().json; const texto = (body.texto || '').toLowerCase().trim(); let articulo = texto.replace(/donde esta|dónde está|ubica|busca|donde/gi, '').trim(); return [{ json: { accion: 'consultar_ubicacion', articulo } }];"
+        },
+        "name": "Code_Interpret",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          300,
+          200
+        ],
+        "id": "4d6dcce3-aedd-4c7e-9285-005be7842a70"
+      },
+      {
+        "parameters": {
+          "url": "=http://localhost/noxertez/n8n_mysql_proxy.php?articulo={{ $json.articulo }}",
+          "responseFormat": "json"
+        },
+        "name": "Proxy_SQL_Location",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.1,
+        "position": [
+          500,
+          200
+        ],
+        "id": "07bb45ca-1b07-4791-ad23-16b8881e58d0"
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all(); if (items.length === 0 || !items[0].json) return [{ json: { respuesta: 'Error.' } }]; const data = items[0].json; if (!data || (Array.isArray(data) && data.length === 0)) return [{ json: { respuesta: 'No encontré la ubicación.' } }]; const item = Array.isArray(data) ? data[0] : data; return [{ json: { respuesta: `${item.nombre} está en ${item.ubicacion}.` } }];"
+        },
+        "name": "Code_Response_Builder",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          700,
+          200
+        ],
+        "id": "560f99aa-4c30-42cb-958d-0c8d62dd4f92"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "name": "Webhook_Responder",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          900,
+          200
+        ],
+        "id": "5080afc1-d01c-4fcf-8538-8f8ae1d7d708"
+      }
+    ],
+    "connections": {
+      "Webhook_Asistente": {
+        "main": [
+          [
+            {
+              "node": "Code_Interpret",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code_Interpret": {
+        "main": [
+          [
+            {
+              "node": "Proxy_SQL_Location",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Proxy_SQL_Location": {
+        "main": [
+          [
+            {
+              "node": "Code_Response_Builder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code_Response_Builder": {
+        "main": [
+          [
+            {
+              "node": "Webhook_Responder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {},
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "6f5ad485-1909-421e-9444-d2961ec635a3",
+    "activeVersionId": "6f5ad485-1909-421e-9444-d2961ec635a3",
+    "versionCounter": 8,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:10:59.294Z",
+        "createdAt": "2026-05-06T21:10:59.294Z",
+        "role": "workflow:owner",
+        "workflowId": "n2ZQ2yhnmTY2zcxZ",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version 6f5ad485",
+      "description": ""
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T22:07:38.212Z",
+    "createdAt": "2026-05-06T21:31:29.525Z",
+    "id": "7045a416-8f3f-44",
+    "name": "01 - Pedido Manual desde App Noxertez (v2)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "nuevo-pedido",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "node-webhook",
+        "name": "Webhook Pedido Manual",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          208,
+          304
+        ],
+        "webhookId": "b47cd27c-6039-4c00-8e57-897bd1871732",
+        "notes": "URL: http://localhost:5678/webhook/nuevo-pedido — Tu app llama aquí al crear un pedido"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json;\n\nif (!body.items || body.items.length === 0) {\n  throw new Error('El pedido no tiene artículos');\n}\n\nconst numeroPedido = 'PED-' + Date.now();\nlet total = 0;\n\nconst items = body.items.map(item => {\n  const subtotal = (parseFloat(item.precio) || 0) * (parseInt(item.cantidad) || 1);\n  total += subtotal;\n  return {\n    referencia: item.referencia || item.sku || 'SIN-REF',\n    nombre: item.nombre || item.referencia || 'Artículo sin nombre',\n    cantidad: parseInt(item.cantidad) || 1,\n    precio_unit: parseFloat(item.precio) || 0,\n    subtotal: subtotal\n  };\n});\n\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: body.telefono || '',\n  nombre_cliente: body.cliente || body.nombre_cliente || 'Cliente sin nombre',\n  id_cliente: body.id_cliente || null,\n  items_json: JSON.stringify(items),\n  total: parseFloat(total.toFixed(2)),\n  estado: 'pendiente',\n  fecha_pedido: new Date().toISOString().slice(0, 19).replace('T', ' '),\n  canal: body.canal || 'manual',\n  canal_origen: body.canal_origen || 'directo',\n  notas: body.notas || ''\n}}];"
+        },
+        "id": "node-preparar",
+        "name": "Preparar datos pedido",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          448,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, id_cliente, items_json, total, estado, fecha_pedido, canal, canal_origen, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', {{ $json.id_cliente || 'NULL' }}, '{{ $json.items_json }}', {{ $json.total }}, '{{ $json.estado }}', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.canal_origen }}', '{{ $json.notas }}')",
+          "options": {}
+        },
+        "id": "node-mysql",
+        "name": "Guardar en MySQL",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          672,
+          304
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "fkWyb95ZdBmRmE6n",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('pedido_nuevo', CONCAT('📦 Nuevo pedido manual: ', '{{ $json.numero_pedido }}', ' - ', '{{ $json.nombre_cliente }}', ' (', '{{ $json.total }}', '€)'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif",
+        "name": "Notificación nuevo pedido",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          880,
+          304
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "fkWyb95ZdBmRmE6n",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: true, numero_pedido: $('Preparar datos pedido').first().json.numero_pedido, total: $('Preparar datos pedido').first().json.total, mensaje: 'Pedido guardado correctamente' }) }}",
+          "options": {}
+        },
+        "id": "node-responder",
+        "name": "Responder a la app",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1104,
+          304
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook Pedido Manual": {
+        "main": [
+          [
+            {
+              "node": "Preparar datos pedido",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Preparar datos pedido": {
+        "main": [
+          [
+            {
+              "node": "Guardar en MySQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guardar en MySQL": {
+        "main": [
+          [
+            {
+              "node": "Notificación nuevo pedido",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notificación nuevo pedido": {
+        "main": [
+          [
+            {
+              "node": "Responder a la app",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": {},
+    "versionId": "cac905c3-f330-4a73-9240-a67d5671bfea",
+    "activeVersionId": "cac905c3-f330-4a73-9240-a67d5671bfea",
+    "versionCounter": 7,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:29.528Z",
+        "createdAt": "2026-05-06T21:31:29.528Z",
+        "role": "workflow:owner",
+        "workflowId": "7045a416-8f3f-44",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version cac905c3",
+      "description": ""
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T22:10:38.390Z",
+    "createdAt": "2026-05-06T21:31:33.694Z",
+    "id": "da76fb39-8abf-43",
+    "name": "02 - Parsear Mensaje WhatsApp (v2)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "parsear-mensaje",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "node-webhook",
+        "name": "Webhook Parsear Mensaje",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          208,
+          304
+        ],
+        "webhookId": "efdd7fe0-c6d2-49a1-a4d2-2f8b4abfe4ed",
+        "notes": "URL: http://localhost:5678/webhook/parsear-mensaje — Tu app manda aquí el texto copiado de WhatsApp"
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json;\nconst texto = (body.texto || '').trim();\nconst t = texto.toLowerCase();\n\nif (!texto) {\n  return [{ json: { error: 'Texto vacío', ok: false } }];\n}\n\n// Detectar intención\nlet intencion = 'consulta';\nif (t.match(/quiero|pedir|necesito|manda|env[ií]a|dame|pedido|comprar|encarg/)) intencion = 'pedido';\nelse if (t.match(/estado|donde|cuando|llega|mi pedido|ped-/)) intencion = 'estado_pedido';\nelse if (t.match(/precio|cu[aá]nto|cuesta|vale|coste/)) intencion = 'precio';\nelse if (t.match(/stock|quedan|hay|disponible|tienes/)) intencion = 'stock';\n\n// Detectar número de pedido mencionado\nconst pedidoMencionado = (texto.match(/PED-\\d+/i) || [])[0] || null;\n\n// Extraer items con cantidad\nconst patronCantidad = /(\\d+)\\s*(?:x|de|uds?|unidades?|piezas?)?\\s*([a-záéíóúñA-ZÁÉÍÓÚÑ0-9\\s\\-\\/]{3,50})/gi;\nconst itemsEncontrados = [];\nlet match;\nwhile ((match = patronCantidad.exec(texto)) !== null) {\n  const cantidad = parseInt(match[1]);\n  const producto = match[2].trim().replace(/\\s+/g, ' ');\n  if (cantidad > 0 && cantidad < 1000 && producto.length > 2) {\n    itemsEncontrados.push({ cantidad, descripcion: producto });\n  }\n}\n\n// Extraer teléfono si viene\nconst telMatch = texto.match(/(?:\\+34|0034)?\\s*[6789]\\d{8}/);\nconst telefono = telMatch ? telMatch[0].replace(/\\s/g, '') : (body.telefono || '');\n\nreturn [{ json: {\n  ok: true,\n  intencion,\n  texto_original: texto,\n  telefono,\n  nombre: body.nombre || '',\n  items_detectados: itemsEncontrados,\n  pedido_mencionado: pedidoMencionado,\n  timestamp: new Date().toISOString()\n}}];"
+        },
+        "id": "node-parsear",
+        "name": "Parsear texto del mensaje",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          432,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {},
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.intencion }}",
+                      "rightValue": "pedido",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "pedido"
+              },
+              {
+                "conditions": {
+                  "options": {},
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.intencion }}",
+                      "rightValue": "estado_pedido",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                },
+                "renameOutput": true,
+                "outputKey": "estado"
+              }
+            ]
+          },
+          "options": {
+            "fallbackOutput": "extra"
+          }
+        },
+        "id": "node-switch",
+        "name": "Enrutar por intención",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          640,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const d = $input.first().json;\nconst numeroPedido = 'PED-' + Date.now();\nconst items = d.items_detectados.map(item => ({\n  referencia: 'PENDIENTE',\n  nombre: item.descripcion,\n  cantidad: item.cantidad,\n  precio_unit: 0,\n  subtotal: 0\n}));\nreturn [{ json: {\n  numero_pedido: numeroPedido,\n  telefono: d.telefono,\n  nombre_cliente: d.nombre || 'Por identificar',\n  items_json: JSON.stringify(items),\n  estado: 'borrador',\n  fecha_pedido: d.timestamp.slice(0, 19).replace('T', ' '),\n  canal: 'whatsapp_manual',\n  canal_origen: 'whatsapp',\n  notas: 'Parseado automáticamente. Revisar precios y referencias. Texto: ' + d.texto_original.substring(0, 200)\n}}];"
+        },
+        "id": "node-crear-borrador",
+        "name": "Crear borrador pedido",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO pedidos (numero_pedido, telefono, nombre_cliente, items_json, total, estado, fecha_pedido, canal, canal_origen, notas) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.items_json }}', 0, 'borrador', '{{ $json.fecha_pedido }}', '{{ $json.canal }}', '{{ $json.canal_origen }}', '{{ $json.notas }}')",
+          "options": {}
+        },
+        "id": "node-guardar-borrador",
+        "name": "Guardar borrador MySQL",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          160
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "fkWyb95ZdBmRmE6n",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: true, intencion: 'pedido', items_detectados: $('Parsear texto del mensaje').first().json.items_detectados, numero_pedido: $('Crear borrador pedido').first().json.numero_pedido, mensaje: 'Borrador creado. Revisa y completa precios en la app.' }) }}",
+          "options": {}
+        },
+        "id": "node-resp-pedido",
+        "name": "Responder: borrador creado",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1328,
+          160
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT numero_pedido, estado, fecha_pedido, total FROM pedidos WHERE (numero_pedido = '{{ $json.pedido_mencionado }}' OR (telefono = '{{ $json.telefono }}' AND telefono != '')) ORDER BY fecha_pedido DESC LIMIT 3",
+          "options": {}
+        },
+        "id": "node-buscar-estado",
+        "name": "Buscar estado pedido",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          880,
+          368
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "fkWyb95ZdBmRmE6n",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: true, intencion: 'estado_pedido', pedidos: $input.all().map(i => i.json), mensaje: 'Pedidos encontrados' }) }}",
+          "options": {}
+        },
+        "id": "node-resp-estado",
+        "name": "Responder: estado pedidos",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1104,
+          368
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({ ok: true, intencion: $('Parsear texto del mensaje').first().json.intencion, items_detectados: $('Parsear texto del mensaje').first().json.items_detectados, mensaje: 'Mensaje analizado. Intención: ' + $('Parsear texto del mensaje').first().json.intencion }) }}",
+          "options": {}
+        },
+        "id": "node-resp-otro",
+        "name": "Responder: otro tipo",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          880,
+          544
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook Parsear Mensaje": {
+        "main": [
+          [
+            {
+              "node": "Parsear texto del mensaje",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parsear texto del mensaje": {
+        "main": [
+          [
+            {
+              "node": "Enrutar por intención",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Enrutar por intención": {
+        "main": [
+          [
+            {
+              "node": "Crear borrador pedido",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Buscar estado pedido",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Responder: otro tipo",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Crear borrador pedido": {
+        "main": [
+          [
+            {
+              "node": "Guardar borrador MySQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guardar borrador MySQL": {
+        "main": [
+          [
+            {
+              "node": "Responder: borrador creado",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buscar estado pedido": {
+        "main": [
+          [
+            {
+              "node": "Responder: estado pedidos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": {},
+    "versionId": "30506455-b49e-46e3-a06b-ffb54e29d516",
+    "activeVersionId": "30506455-b49e-46e3-a06b-ffb54e29d516",
+    "versionCounter": 7,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:33.697Z",
+        "createdAt": "2026-05-06T21:31:33.697Z",
+        "role": "workflow:owner",
+        "workflowId": "da76fb39-8abf-43",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version 30506455",
+      "description": ""
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T22:11:00.623Z",
+    "createdAt": "2026-05-06T21:31:38.190Z",
+    "id": "2906f52b-1085-4d",
+    "name": "03 - Seguimiento Post-Venta (v2)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 4
+              }
+            ]
+          }
+        },
+        "id": "node-trigger",
+        "name": "[POST-VENTA] Revisar cada 4 horas",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          208,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT numero_pedido, telefono, nombre_cliente, fecha_entrega FROM pedidos WHERE estado = 'entregado' AND seguimiento_enviado = 0 AND fecha_entrega IS NOT NULL AND DATE_ADD(fecha_entrega, INTERVAL 24 HOUR) <= NOW() LIMIT 10",
+          "options": {}
+        },
+        "id": "node-buscar",
+        "name": "Buscar pedidos para seguimiento",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          448,
+          304
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.numero_pedido }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "node-hay",
+        "name": "¿Hay pedidos?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          672,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const d = $input.first().json;\nconst nombre = d.nombre_cliente || 'cliente';\nconst pedido = d.numero_pedido || '';\nconst texto = `Hola ${nombre}! 😊 Han pasado 24h desde que recibiste tu pedido ${pedido}. ¿Todo llegó perfectamente? ¿Estás contento con tu compra? Nos encantaría saberlo. ¡Gracias por confiar en Noxertez! 🪵`;\nreturn [{ json: {\n  numero_pedido: pedido,\n  telefono: d.telefono || '',\n  nombre_cliente: nombre,\n  texto_mensaje: texto,\n  timestamp: new Date().toISOString()\n}}];"
+        },
+        "id": "node-preparar",
+        "name": "Preparar mensaje seguimiento",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          192
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO seguimientos_pendientes (numero_pedido, telefono, nombre_cliente, texto_mensaje, fecha_creacion, enviado) VALUES ('{{ $json.numero_pedido }}', '{{ $json.telefono }}', '{{ $json.nombre_cliente }}', '{{ $json.texto_mensaje }}', NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-guardar",
+        "name": "Guardar en cola seguimientos",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          192
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        },
+        "notes": "Tu app muestra esta cola con botón Copiar para enviarlo tú por WhatsApp"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE pedidos SET seguimiento_enviado = 1 WHERE numero_pedido = '{{ $json.numero_pedido }}'",
+          "options": {}
+        },
+        "id": "node-marcar",
+        "name": "Marcar seguimiento procesado",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1328,
+          192
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('seguimiento_postventa', CONCAT('📬 Seguimiento pendiente de enviar a ', '{{ $(\"Preparar mensaje seguimiento\").json.nombre_cliente }}', ' - Pedido ', '{{ $(\"Preparar mensaje seguimiento\").json.numero_pedido }}'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif",
+        "name": "Notificación en Mega Gestor",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1552,
+          192
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { info: 'Sin pedidos para seguimiento en este ciclo' } }];"
+        },
+        "id": "node-nada",
+        "name": "Sin pedidos pendientes",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          432
+        ]
+      }
+    ],
+    "connections": {
+      "Revisar cada 4 horas": {
+        "main": [
+          [
+            {
+              "node": "Buscar pedidos para seguimiento",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buscar pedidos para seguimiento": {
+        "main": [
+          [
+            {
+              "node": "¿Hay pedidos?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Hay pedidos?": {
+        "main": [
+          [
+            {
+              "node": "Preparar mensaje seguimiento",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Sin pedidos pendientes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Preparar mensaje seguimiento": {
+        "main": [
+          [
+            {
+              "node": "Guardar en cola seguimientos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guardar en cola seguimientos": {
+        "main": [
+          [
+            {
+              "node": "Marcar seguimiento procesado",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Marcar seguimiento procesado": {
+        "main": [
+          [
+            {
+              "node": "Notificación en Mega Gestor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "[POST-VENTA] Revisar cada 4 horas": {
+        "main": [
+          [
+            {
+              "node": "Buscar pedidos para seguimiento",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": {
+      "node:[POST-VENTA] Revisar cada 4 horas": {
+        "recurrenceRules": [
+          4
+        ]
+      }
+    },
+    "meta": null,
+    "pinData": {},
+    "versionId": "9e6ed5d4-62d1-4ee5-bda6-f05316d35afe",
+    "activeVersionId": "9e6ed5d4-62d1-4ee5-bda6-f05316d35afe",
+    "versionCounter": 10,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:38.193Z",
+        "createdAt": "2026-05-06T21:31:38.193Z",
+        "role": "workflow:owner",
+        "workflowId": "2906f52b-1085-4d",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version 9e6ed5d4",
+      "description": ""
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T21:31:42.418Z",
+    "createdAt": "2026-05-06T21:31:42.418Z",
+    "id": "f7887468-e676-4d",
+    "name": "04 - Alertas Stock + Resumen Diario",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9,14,19 * * *"
+              }
+            ]
+          }
+        },
+        "id": "node-trigger-stock",
+        "name": "Revisar stock (9h, 14h, 19h)",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          200,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 20 * * *"
+              }
+            ]
+          }
+        },
+        "id": "node-trigger-resumen",
+        "name": "Resumen ventas a las 20h",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          200,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT SKU_REF as referencia, NOMBRE as nombre, STOCK_FISICO as stock, stock_minimo FROM productos WHERE STOCK_FISICO <= stock_minimo AND alerta_stock_enviada = 0",
+          "options": {}
+        },
+        "id": "node-stock-bajo",
+        "name": "Artículos con stock bajo",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 1,
+        "position": [
+          420,
+          200
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "MI_CRED_MYSQL",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.referencia }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-hay-stock",
+        "name": "¿Stock bajo?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nlet alerta = 'ALERTA STOCK BAJO - ' + new Date().toLocaleString('es-ES') + '\\n\\n';\nfor (const item of items) {\n  alerta += `- ${item.json.nombre} (${item.json.referencia}): ${item.json.stock} uds (min: ${item.json.stock_minimo})\\n`;\n}\nreturn [{ json: { texto_alerta: alerta, referencias: items.map(i => i.json.referencia) } }];"
+        },
+        "id": "node-crear-alerta",
+        "name": "Crear texto alerta",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          120
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('stock_bajo', '{{ $json.texto_alerta }}', NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-guardar-alerta",
+        "name": "Guardar alerta en app",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 1,
+        "position": [
+          1080,
+          120
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "MI_CRED_MYSQL",
+            "name": "Noxertez MySQL"
+          }
+        },
+        "notes": "Tu app Noxertez lee esta tabla y muestra las alertas con una campana de notificación"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE productos SET alerta_stock_enviada = 1 WHERE SKU_REF IN ('{{ $('Crear texto alerta').first().json.referencias.join(\"', '\") }}')",
+          "options": {}
+        },
+        "id": "node-marcar-alerta",
+        "name": "Marcar alerta enviada",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 1,
+        "position": [
+          1300,
+          120
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "MI_CRED_MYSQL",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT COUNT(*) as total_pedidos, COALESCE(SUM(total), 0) as facturado, COUNT(DISTINCT telefono) as clientes FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'",
+          "options": {}
+        },
+        "id": "node-stats",
+        "name": "Stats del día",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 1,
+        "position": [
+          420,
+          480
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "MI_CRED_MYSQL",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT items_json FROM pedidos WHERE DATE(fecha_pedido) = CURDATE() AND estado != 'cancelado' AND estado != 'borrador'",
+          "options": {}
+        },
+        "id": "node-items-dia",
+        "name": "Items vendidos hoy",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 1,
+        "position": [
+          640,
+          480
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "MI_CRED_MYSQL",
+            "name": "Noxertez MySQL"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const stats = $('Stats del día').first().json;\nconst pedidos = $('Items vendidos hoy').all();\n\nconst conteo = {};\nfor (const p of pedidos) {\n  try {\n    const items = JSON.parse(p.json.items_json || '[]');\n    for (const item of items) {\n      const key = item.nombre || item.referencia || 'Desconocido';\n      conteo[key] = (conteo[key] || 0) + (item.cantidad || 1);\n    }\n  } catch(e) {}\n}\n\nconst top = Object.entries(conteo).sort((a,b) => b[1]-a[1]).slice(0,5);\nconst fecha = new Date().toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });\n\nlet resumen = `RESUMEN DEL DIA - ${fecha}\\n`;\nresumen += `Pedidos: ${stats.total_pedidos || 0}\\n`;\nresumen += `Facturado: ${(stats.facturado || 0).toFixed(2)} EUR\\n`;\nresumen += `Clientes: ${stats.clientes || 0}\\n`;\nif (top.length > 0) {\n  resumen += `\\nMas vendidos:\\n`;\n  top.forEach(([nombre, qty]) => { resumen += `  - ${nombre}: ${qty} uds\\n`; });\n}\n\nreturn [{ json: { resumen } }];"
+        },
+        "id": "node-crear-resumen",
+        "name": "Crear resumen del día",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          480
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('resumen_diario', '{{ $json.resumen }}', NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-guardar-resumen",
+        "name": "Guardar resumen en app",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 1,
+        "position": [
+          1080,
+          480
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "MI_CRED_MYSQL",
+            "name": "Noxertez MySQL"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Revisar stock (9h, 14h, 19h)": {
+        "main": [
+          [
+            {
+              "node": "Artículos con stock bajo",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Artículos con stock bajo": {
+        "main": [
+          [
+            {
+              "node": "¿Stock bajo?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Stock bajo?": {
+        "main": [
+          [
+            {
+              "node": "Crear texto alerta",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Crear texto alerta": {
+        "main": [
+          [
+            {
+              "node": "Guardar alerta en app",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guardar alerta en app": {
+        "main": [
+          [
+            {
+              "node": "Marcar alerta enviada",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Resumen ventas a las 20h": {
+        "main": [
+          [
+            {
+              "node": "Stats del día",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Stats del día": {
+        "main": [
+          [
+            {
+              "node": "Items vendidos hoy",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Items vendidos hoy": {
+        "main": [
+          [
+            {
+              "node": "Crear resumen del día",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Crear resumen del día": {
+        "main": [
+          [
+            {
+              "node": "Guardar resumen en app",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": {
+      "node:Revisar stock (9h, 14h, 19h)": {
+        "recurrenceRules": []
+      },
+      "node:Resumen ventas a las 20h": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": null,
+    "pinData": null,
+    "versionId": "39ce9f6e-60f8-439f-a768-cab57e3783c7",
+    "activeVersionId": "39ce9f6e-60f8-439f-a768-cab57e3783c7",
+    "versionCounter": 6,
+    "triggerCount": 2,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:42.420Z",
+        "createdAt": "2026-05-06T21:31:42.420Z",
+        "role": "workflow:owner",
+        "workflowId": "f7887468-e676-4d",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version 39ce9f6e",
+      "description": ""
+    }
+  },
+  {
+    "updatedAt": "2026-05-07T01:46:00.000Z",
+    "createdAt": "2026-05-06T21:31:46.725Z",
+    "id": "6d2db2de-afef-46",
+    "name": "05 - Asistente por Voz (General)",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "asistente-general",
+          "responseMode": "lastNode"
+        },
+        "id": "node-webhook",
+        "name": "Webhook Asistente",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          100,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// CAPTURA ROBUSTA\nconst body = $input.first().json.body || $input.first().json;\nconst texto = (body.texto || body.message || body.query || '').toLowerCase().trim();\n\nif (!texto || texto.length < 2) {\n  return [{ json: { accion: 'error', respuesta: 'No recibí texto claro.', datos: null } }];\n}\n\nlet accion = 'no_entendido';\nlet respuesta = 'No entendí el comando.';\n\nif (texto.match(/pedido|pedidos|cu[aá]ntos hay|preparar/)) {\n  accion = 'consultar_pedidos';\n  respuesta = 'Consultando pedidos...';\n} else if (texto.match(/qu[eé] hay que hacer|tareas|pendiente|qu[eé] tengo|hoy que|hacer hoy/)) {\n  accion = 'consultar_tareas';\n  respuesta = 'Consultando tus tareas...';\n} else if (texto.match(/resumen|c[oó]mo ha ido|ventas|hoy|d[ií]a/)) {\n  accion = 'resumen_dia';\n  respuesta = 'Preparando el resumen de hoy...';\n} else {\n  respuesta = `No reconocí: \"${texto}\". Prueba con: Pedidos pendientes, Tareas de hoy o Resumen del día.`;\n}\n\nreturn [{ json: { accion, respuesta, texto_original: texto } }];"
+        },
+        "id": "node-interpretar",
+        "name": "Interpretar",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          300,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {},
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.accion }}",
+                      "rightValue": "consultar_pedidos",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "conditions": {
+                  "options": {},
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.accion }}",
+                      "rightValue": "consultar_tareas",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "conditions": {
+                  "options": {},
+                  "conditions": [
+                    {
+                      "leftValue": "={{ $json.accion }}",
+                      "rightValue": "resumen_dia",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-switch",
+        "name": "Switch",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 3,
+        "position": [
+          500,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT numero_pedido, nombre_cliente FROM pedidos WHERE estado = 'pendiente' LIMIT 5",
+          "options": {}
+        },
+        "id": "node-pedidos",
+        "name": "MySQL_Pedidos",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          750,
+          150
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT descripcion FROM tareas WHERE completada = 0 LIMIT 5",
+          "options": {}
+        },
+        "id": "node-tareas",
+        "name": "MySQL_Tareas",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          750,
+          300
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT COUNT(*) as total FROM pedidos WHERE DATE(fecha_pedido) = CURDATE()",
+          "options": {}
+        },
+        "id": "node-resumen",
+        "name": "MySQL_Resumen",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          750,
+          450
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const data = $input.all(); const prev = $('Interpretar').first().json; let res = ''; if (prev.accion === 'consultar_pedidos') { res = `Tienes ${data.length} pedidos pendientes.`; } else if (prev.accion === 'consultar_tareas') { res = `Tienes ${data.length} tareas para hoy.`; } else if (prev.accion === 'resumen_dia') { res = `Hoy llevas ${data[0]?.json?.total || 0} pedidos.`; } else { res = prev.respuesta; } return [{ json: { respuesta: res, accion: prev.accion } }];"
+        },
+        "id": "node-builder",
+        "name": "Builder",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1000,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify($json) }}"
+        },
+        "id": "node-responder",
+        "name": "Responder",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          1200,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook Asistente": {
+        "main": [
+          [
+            {
+              "node": "Interpretar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Interpretar": {
+        "main": [
+          [
+            {
+              "node": "Switch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch": {
+        "main": [
+          [
+            {
+              "node": "MySQL_Pedidos",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "MySQL_Tareas",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "MySQL_Resumen",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "MySQL_Pedidos": {
+        "main": [
+          [
+            {
+              "node": "Builder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "MySQL_Tareas": {
+        "main": [
+          [
+            {
+              "node": "Builder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "MySQL_Resumen": {
+        "main": [
+          [
+            {
+              "node": "Builder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Builder": {
+        "main": [
+          [
+            {
+              "node": "Responder",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": {},
+    "versionId": "f36da1ac-16b5-4258-835a-ddc60b90c358",
+    "activeVersionId": "f36da1ac-16b5-4258-835a-ddc60b90c358",
+    "versionCounter": 20,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:46.729Z",
+        "createdAt": "2026-05-06T21:31:46.729Z",
+        "role": "workflow:owner",
+        "workflowId": "6d2db2de-afef-46",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version f36da1ac",
+      "description": ""
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T21:31:51.108Z",
+    "createdAt": "2026-05-06T21:31:51.108Z",
+    "id": "53d429fa-bc39-48",
+    "name": "06 - Correo a Pedido (Anti-spam + Anti-bucle)",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "content": "### 📦 GESTIÓN DE PEDIDOS\nEste flujo monitoriza correos entrantes y los guarda como BORRADORES en el CMS.\n\n**Emails aceptados:** pedidos@noxertez.com",
+          "height": 160,
+          "width": 300
+        },
+        "id": "sticky-pedidos",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "mailbox": "INBOX",
+          "options": {
+            "allowUnauthorizedCerts": false
+          },
+          "postProcessAction": "read"
+        },
+        "id": "node-imap",
+        "name": "[PEDIDOS] Nuevo Correo IMAP",
+        "type": "n8n-nodes-base.emailReadImap",
+        "typeVersion": 2,
+        "position": [
+          200,
+          300
+        ],
+        "credentials": {
+          "imap": {
+            "id": "",
+            "name": "IMAP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\nconst cuerpo = (email.text || email.html || '').toLowerCase();\n\n// Solo ignorar errores de sistema críticos\nconst esPropio = de.includes('mailer-daemon') || de.includes('postmaster');\n\n// Detección de destinatario\nlet tipoPedido = 'desconocido';\nif (para.includes('pedidos@noxertez.com')) tipoPedido = 'pedido_directo';\nelse if (para.includes('info@noxertez.com')) tipoPedido = 'info_general';\nelse if (para.includes('influencer@noxertez.com')) tipoPedido = 'influencer';\nelse if (para.includes('ayuda@noxertez.com')) tipoPedido = 'soporte';\n\n// Ignorar solo si es error de sistema o no va a ninguna de nuestras cuentas\nconst ignorar = esPropio || tipoPedido === 'desconocido';\n\nreturn [{ json: {\n  ignorar,\n  motivo_ignorar: esPropio ? 'correo_sistema' : tipoPedido === 'desconocido' ? 'destinatario_ajeno' : null,\n  tipo: tipoPedido,\n  de: email.from || '',\n  para: email.to || '',\n  asunto: email.subject || '',\n  cuerpo_raw: (email.text || '').substring(0, 500),\n  fecha: new Date().toISOString()\n}}];"
+        },
+        "id": "node-filtrar",
+        "name": "Filtrar spam y bucles",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.ignorar }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-es-spam",
+        "name": "¿Es spam o bucle?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Correo ignorado, no hacer nada\nreturn [{ json: { info: 'Correo ignorado: ' + $input.first().json.motivo_ignorar } }];"
+        },
+        "id": "node-ignorar",
+        "name": "Ignorar silenciosamente",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          180
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const d = $input.first().json;\n\n// Extraer nombre del remitente\nconst deRaw = d.de || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nif (!nombre) nombre = 'Cliente sin nombre';\n\n// Extraer teléfono si aparece en el cuerpo\nconst telMatch = d.cuerpo_raw.match(/(?:\\+34|0034)?\\s*[6789]\\d{8}/);\nconst telefono = telMatch ? telMatch[0].replace(/\\s/g, '') : '';\n\n// Número de pedido único\nconst numero_pedido = 'EMAIL-' + Date.now();\n\n// Preparar items básicos (el cuerpo libre sin parsear)\nconst items = [{ \n  referencia: 'PENDIENTE', \n  nombre: 'Ver correo - completar manualmente', \n  cantidad: 1, \n  precio_unit: 0, \n  subtotal: 0 \n}];\n\n// Etiqueta según tipo\nconst etiquetas = {\n  'pedido_directo': '📦 PEDIDO',\n  'info_general': 'ℹ️ CONSULTA',\n  'influencer': '🌟 INFLUENCER',\n  'soporte': '🆘 AYUDA',\n  'gmail_directo': '📧 GMAIL',\n  'desconocido': '❓ REVISAR'\n};\nconst etiqueta = etiquetas[d.tipo] || '❓ REVISAR';\n\nreturn [{ json: {\n  numero_pedido,\n  nombre_cliente: nombre,\n  email_cliente: deRaw,\n  telefono,\n  tipo: d.tipo,\n  etiqueta,\n  items_json: JSON.stringify(items),\n  notas: `${etiqueta} | Asunto: ${d.asunto} | De: ${deRaw} | Mensaje: ${d.cuerpo_raw}`,\n  fecha_pedido: d.fecha\n}}];"
+        },
+        "id": "node-preparar",
+        "name": "Preparar datos correo",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          420
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO pedidos (numero_pedido, nombre_cliente, telefono, items_json, total, estado, canal, notas, fecha_pedido) VALUES ('{{ $json.numero_pedido }}', '{{ $json.nombre_cliente }}', '{{ $json.telefono }}', '{{ $json.items_json }}', 0, 'borrador', 'email', '{{ $json.notas }}', '{{ $json.fecha_pedido }}')",
+          "options": {}
+        },
+        "id": "node-guardar",
+        "name": "Guardar como BORRADOR",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          420
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        },
+        "notes": "Estado BORRADOR: aparece en tu app para que lo completes manualmente"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('correo_pedido', CONCAT('{{ $json.etiqueta }}', ' por email de ', '{{ $json.nombre_cliente }}', ' | ', '{{ $json.numero_pedido }}'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif",
+        "name": "Notificación en Mega Gestor",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          420
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "[PEDIDOS] Nuevo Correo IMAP": {
+        "main": [
+          [
+            {
+              "node": "Filtrar spam y bucles",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filtrar spam y bucles": {
+        "main": [
+          [
+            {
+              "node": "¿Es spam o bucle?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Es spam o bucle?": {
+        "main": [
+          [
+            {
+              "node": "Ignorar silenciosamente",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Preparar datos correo",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Preparar datos correo": {
+        "main": [
+          [
+            {
+              "node": "Guardar como BORRADOR",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Guardar como BORRADOR": {
+        "main": [
+          [
+            {
+              "node": "Notificación en Mega Gestor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "efe6360b-e74c-4792-8467-500e06ae896f",
+    "activeVersionId": null,
+    "versionCounter": 1,
+    "triggerCount": 0,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:51.110Z",
+        "createdAt": "2026-05-06T21:31:51.110Z",
+        "role": "workflow:owner",
+        "workflowId": "53d429fa-bc39-48",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T21:31:55.342Z",
+    "createdAt": "2026-05-06T21:31:55.342Z",
+    "id": "d3f79c0d-6014-44",
+    "name": "07 - Correo Influencer a BD Noxertez",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "content": "### 🌟 GESTIÓN DE INFLUENCERS\nEste flujo detecta propuestas de influencers y los registra en la base de datos.\n\n**Emails aceptados:** influencer@noxertez.com",
+          "height": 160,
+          "width": 300
+        },
+        "id": "sticky-influencers",
+        "name": "Sticky Note",
+        "type": "n8n-nodes-base.stickyNote",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "mailbox": "INBOX",
+          "options": {
+            "allowUnauthorizedCerts": false
+          },
+          "postProcessAction": "read",
+          "filters": {
+            "sender": ""
+          }
+        },
+        "id": "node-imap",
+        "name": "[INFLUENCERS] Nuevo Correo IMAP",
+        "type": "n8n-nodes-base.emailReadImap",
+        "typeVersion": 2,
+        "position": [
+          200,
+          300
+        ],
+        "credentials": {
+          "imap": {
+            "id": "",
+            "name": "IMAP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\n\n// Solo procesar correos a influencer@noxertez.com\nconst esParaInfluencer = para.includes('influencer@noxertez.com');\n\n// Anti-bucle (ignorar solo errores de sistema)\nconst esPropio = de.includes('mailer-daemon') || de.includes('postmaster');\n\n// ACEPTAR TODO lo que vaya a influencer y no sea error de sistema\nconst ignorar = !esParaInfluencer || esPropio;\n\nif (ignorar) {\n  return [{ json: { ignorar: true, motivo: !esParaInfluencer ? 'no_es_influencer' : 'correo_sistema' } }];\n}\n\n// Extraer datos del remitente\nconst deRaw = email.from || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nif (!nombre || nombre.length < 2) nombre = deRaw.split('@')[0];\n\nconst emailCliente = deRaw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\nconst emailLimpio = emailCliente ? emailCliente[0] : deRaw;\n\nconst cuerpo = (email.text || email.html || '').substring(0, 800);\n\n// Intentar detectar red social e @usuario mencionados en el cuerpo\nconst igMatch = cuerpo.match(/@([a-zA-Z0-9._]{2,30})/);\nconst usuarioIG = igMatch ? igMatch[1] : '';\n\nconst redSocial = cuerpo.toLowerCase().includes('tiktok') ? 'TikTok' :\n                  cuerpo.toLowerCase().includes('youtube') ? 'YouTube' :\n                  cuerpo.toLowerCase().includes('instagram') ? 'Instagram' : 'Instagram';\n\n// Intentar detectar seguidores mencionados\nconst segMatch = cuerpo.match(/(\\d[\\d.,]+)\\s*(?:seguidores|followers|subs)/i);\nlet seguidores = 0;\nif (segMatch) {\n  seguidores = parseInt(segMatch[1].replace(/[.,]/g, ''));\n}\n\nreturn [{ json: {\n  ignorar: false,\n  nombre,\n  email: emailLimpio,\n  red_social: redSocial,\n  usuario_ig: usuarioIG,\n  seguidores,\n  nicho: '',\n  vibe_estilo: '',\n  likes_promedio: 0,\n  activo: 1,\n  notas_contacto: `Asunto: ${email.subject || ''} | Mensaje: ${cuerpo.substring(0, 300)}`,\n  fecha: new Date().toISOString()\n}}];"
+        },
+        "id": "node-filtrar",
+        "name": "Filtrar y extraer datos influencer",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.ignorar }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-check",
+        "name": "¿Ignorar?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { info: 'Correo ignorado: ' + $input.first().json.motivo } }];"
+        },
+        "id": "node-ignorar",
+        "name": "Ignorar",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          180
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT id FROM influencers WHERE email = '{{ $json.email }}' LIMIT 1",
+          "options": {}
+        },
+        "id": "node-check-existe",
+        "name": "¿Ya existe este influencer?",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          860,
+          420
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.id }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notExists"
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-es-nuevo",
+        "name": "¿Es nuevo?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          420
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO influencers (nombre, red_social, usuario_ig, seguidores, email, telefono, vibe_estilo, nicho, likes_promedio, activo) VALUES ('{{ $('Filtrar y extraer datos influencer').first().json.nombre }}', '{{ $('Filtrar y extraer datos influencer').first().json.red_social }}', '{{ $('Filtrar y extraer datos influencer').first().json.usuario_ig }}', {{ $('Filtrar y extraer datos influencer').first().json.seguidores }}, '{{ $('Filtrar y extraer datos influencer').first().json.email }}', '', '', '', 0, 1)",
+          "options": {}
+        },
+        "id": "node-insertar",
+        "name": "Crear influencer en BD",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          320
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        },
+        "notes": "Inserta el influencer con los datos básicos extraídos del correo. Completa el resto en la app."
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('influencer_nuevo', CONCAT('🌟 Nuevo influencer por email: ', '{{ $('Filtrar y extraer datos influencer').first().json.nombre }}', ' (', '{{ $('Filtrar y extraer datos influencer').first().json.email }}', ')'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif-nuevo",
+        "name": "Notificación influencer nuevo",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1520,
+          320
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('influencer_repetido', CONCAT('🌟 Correo de influencer ya registrado: ', '{{ $('Filtrar y extraer datos influencer').first().json.nombre }}', ' | ', '{{ $('Filtrar y extraer datos influencer').first().json.notas_contacto }}'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif-existe",
+        "name": "Notificación influencer existente",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          540
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "[INFLUENCERS] Nuevo Correo IMAP": {
+        "main": [
+          [
+            {
+              "node": "Filtrar y extraer datos influencer",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filtrar y extraer datos influencer": {
+        "main": [
+          [
+            {
+              "node": "¿Ignorar?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Ignorar?": {
+        "main": [
+          [
+            {
+              "node": "Ignorar",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "¿Ya existe este influencer?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Ya existe este influencer?": {
+        "main": [
+          [
+            {
+              "node": "¿Es nuevo?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Es nuevo?": {
+        "main": [
+          [
+            {
+              "node": "Crear influencer en BD",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Notificación influencer existente",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Crear influencer en BD": {
+        "main": [
+          [
+            {
+              "node": "Notificación influencer nuevo",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "42d2db75-20b8-40bb-b199-4880a74ac616",
+    "activeVersionId": null,
+    "versionCounter": 1,
+    "triggerCount": 0,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:55.345Z",
+        "createdAt": "2026-05-06T21:31:55.345Z",
+        "role": "workflow:owner",
+        "workflowId": "d3f79c0d-6014-44",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T21:31:59.574Z",
+    "createdAt": "2026-05-06T21:31:59.574Z",
+    "id": "435ec350-1a0f-46",
+    "name": "08 - Correo Info y Ayuda a Mega Gestor",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "mailbox": "INBOX",
+          "options": {
+            "allowUnauthorizedCerts": false
+          },
+          "postProcessAction": "read"
+        },
+        "id": "node-imap",
+        "name": "Nuevo Correo IMAP",
+        "type": "n8n-nodes-base.emailReadImap",
+        "typeVersion": 2,
+        "position": [
+          200,
+          300
+        ],
+        "credentials": {
+          "imap": {
+            "id": "",
+            "name": "IMAP account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const email = $input.first().json;\n\nconst de = (email.from || '').toLowerCase();\nconst para = (email.to || '').toLowerCase();\nconst asunto = (email.subject || '').toLowerCase();\n\n// Solo procesar info@ y ayuda@\nconst esParaInfo = para.includes('info@noxertez.com');\nconst esParaAyuda = para.includes('ayuda@noxertez.com');\n\n// Anti-bucle (solo sistema)\nconst esPropio = de.includes('mailer-daemon') || de.includes('postmaster');\n\n// Si va a info o ayuda, procesar SIEMPRE\nconst ignorar = (!esParaInfo && !esParaAyuda) || esPropio;\n\nif (ignorar) {\n  return [{ json: { ignorar: true } }];\n}\n\n// Extraer remitente\nconst deRaw = email.from || '';\nlet nombre = deRaw.includes('<') ? deRaw.split('<')[0].trim().replace(/\"/g, '') : deRaw.split('@')[0];\nconst emailMatch = deRaw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\nconst emailLimpio = emailMatch ? emailMatch[0] : deRaw;\n\nconst tipo = esParaAyuda ? 'ayuda' : 'info';\nconst emoji = esParaAyuda ? '🆘' : 'ℹ️';\nconst cuerpo = (email.text || '').substring(0, 400);\n\nreturn [{ json: {\n  ignorar: false,\n  tipo,\n  emoji,\n  nombre,\n  email: emailLimpio,\n  asunto: email.subject || '(sin asunto)',\n  cuerpo,\n  fecha: new Date().toISOString()\n}}];"
+        },
+        "id": "node-filtrar",
+        "name": "Filtrar y clasificar",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.ignorar }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true"
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-check",
+        "name": "¿Ignorar?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { info: 'Ignorado' } }];"
+        },
+        "id": "node-ignorar",
+        "name": "Ignorar",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          180
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('correo_{{ $json.tipo }}', CONCAT('{{ $json.emoji }}', ' Correo ', UPPER('{{ $json.tipo }}'), ': ', '{{ $json.nombre }}', ' (', '{{ $json.email }}', ') | Asunto: ', '{{ $json.asunto }}', ' | ', '{{ $json.cuerpo }}'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif",
+        "name": "Crear notificación en Mega Gestor",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          860,
+          420
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        },
+        "notes": "Aparece en el panel de notificaciones del Mega Gestor para que respondas manualmente"
+      }
+    ],
+    "connections": {
+      "Nuevo Correo IMAP": {
+        "main": [
+          [
+            {
+              "node": "Filtrar y clasificar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filtrar y clasificar": {
+        "main": [
+          [
+            {
+              "node": "¿Ignorar?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Ignorar?": {
+        "main": [
+          [
+            {
+              "node": "Ignorar",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Crear notificación en Mega Gestor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "a7125044-67ed-4425-af3e-b58c15a10a12",
+    "activeVersionId": null,
+    "versionCounter": 1,
+    "triggerCount": 0,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:31:59.577Z",
+        "createdAt": "2026-05-06T21:31:59.577Z",
+        "role": "workflow:owner",
+        "workflowId": "435ec350-1a0f-46",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T21:32:03.880Z",
+    "createdAt": "2026-05-06T21:32:03.880Z",
+    "id": "47449235-a9bd-43",
+    "name": "09 - Instagram Auto-Post desde Mockups",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9,15,21 * * *"
+              }
+            ]
+          }
+        },
+        "id": "node-trigger",
+        "name": "Publicar 3 veces al día (9h, 15h, 21h)",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          200,
+          300
+        ],
+        "notes": "Publica 1 mockup en Instagram a las 9h, 15h y 21h"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT m.id, m.ruta, m.archivo, m.estancia, m.estilo, m.decoracion, m.formato, m.marca_noxertez, m.marca_candleholder, m.marca_zen, a.nombre as nombre_producto, a.descripcion as desc_producto, a.categoria FROM mockups_varios m LEFT JOIN mockups_vinculaciones mv ON mv.mockup_id = m.id LEFT JOIN articulos a ON mv.sku = a.referencia WHERE m.publicado_instagram IS NULL ORDER BY m.veces_usado ASC, RAND() LIMIT 1",
+          "options": {}
+        },
+        "id": "node-buscar-mockup",
+        "name": "Buscar mockup no publicado en Instagram",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          440,
+          300
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        },
+        "notes": "Coge el mockup con menos usos que aún no se ha publicado en Instagram"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.id }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEquals"
+                }
+              }
+            ]
+          }
+        },
+        "id": "node-hay-mockup",
+        "name": "¿Hay mockup disponible?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          660,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const d = $input.first().json;\n\n// Convertir ruta local a URL pública\n// La ruta en DB es tipo: mockups/ARCHIVO.jpg o ruta completa Windows\nlet rutaRaw = d.ruta || d.archivo || '';\nlet imageUrl = '';\n\nif (rutaRaw.startsWith('http')) {\n  imageUrl = rutaRaw;\n} else {\n  // Limpiar ruta Windows y convertir a URL\n  rutaRaw = rutaRaw.replace(/\\\\/g, '/');\n  // Quitar partes de ruta local hasta encontrar 'mockups' o 'imagenes'\n  const partesMockups = rutaRaw.split('mockups/');\n  const partesImagenes = rutaRaw.split('imagenes/');\n  \n  if (partesMockups.length > 1) {\n    imageUrl = 'https://noxertez.com/mockups/' + partesMockups[partesMockups.length - 1];\n  } else if (partesImagenes.length > 1) {\n    imageUrl = 'https://noxertez.com/imagenes/' + partesImagenes[partesImagenes.length - 1];\n  } else {\n    // Último recurso: usar el nombre de archivo directamente\n    const archivo = rutaRaw.split('/').pop().split('\\\\').pop();\n    imageUrl = 'https://noxertez.com/mockups/' + archivo;\n  }\n}\n\n// Detectar marca\nconst marcas = [];\nif (d.marca_noxertez == 1) marcas.push('Noxertez');\nif (d.marca_candleholder == 1) marcas.push('Candleholder');\nif (d.marca_zen == 1) marcas.push('Zen Garden');\nconst marca = marcas[0] || 'Noxertez';\n\n// Datos del mockup\nconst estancia = d.estancia || 'hogar';\nconst estilo = d.estilo || '';\nconst decoracion = d.decoracion || '';\nconst producto = d.nombre_producto || '';\n\n// Hashtags por estancia\nconst hashtagsEstancia = {\n  'salon': '#DecoSalon #LivingRoom #DecoracionSalon',\n  'dormitorio': '#DecoDormitorio #Bedroom #DecoHabitacion',\n  'cocina': '#DecoKitchen #Cocina #CocinaDecoracion',\n  'bano': '#DecoBano #BathroomDecor #Bano',\n  'oficina': '#DecoOficina #HomeOffice #OficinaEnCasa',\n  'exterior': '#DecoExterior #JardinDeco #TerrazaDeco'\n};\nconst htEstancia = hashtagsEstancia[estancia.toLowerCase()] || '#DecoHogar #HomeDecor';\n\n// Generar caption\nconst captions = [\n  `✨ ${producto ? producto + ' en tu ' + estancia : 'Decoración artesanal para tu ' + estancia} 🏠\\n\\nCada pieza de ${marca} está hecha a mano con madera natural. Única e irrepetible. 🪵\\n\\n${htEstancia} #${marca} #MaderaArtesanal #HechoAMano #DecoracionHogar #ArtesaniaEspana`,\n  `🪵 Madera natural. Diseño único. Hogar con alma.\\n\\n${producto ? 'Nuestro ' + producto + ' transforma cualquier ' + estancia + ' en un espacio especial.' : 'Transforma tu ' + estancia + ' con nuestras creaciones artesanales.'}\\n\\n#${marca} #WoodDecor #MaderaDecoracion ${htEstancia} #HandmadeSpain #ArtesaniaEspañola`,\n  `💛 Porque tu hogar merece lo mejor.\\n\\n${producto || 'Decoración artesanal'} para tu ${estancia} — diseñado y fabricado a mano en España. 🌿\\n\\n#${marca} #DecoNatural #MaderaViva ${htEstancia} #EcoDecor #SostenibleYBello`\n];\n\n// Rotar caption según hora del día\nconst hora = new Date().getHours();\nconst idxCaption = hora < 12 ? 0 : hora < 18 ? 1 : 2;\nconst caption = captions[idxCaption];\n\nreturn [{ json: {\n  mockup_id: d.id,\n  image_url: imageUrl,\n  caption,\n  marca,\n  estancia\n}}];"
+        },
+        "id": "node-preparar",
+        "name": "Preparar imagen y caption",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          880,
+          180
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ID }}/media",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "image_url",
+                "value": "={{ $json.image_url }}"
+              },
+              {
+                "name": "caption",
+                "value": "={{ $json.caption }}"
+              },
+              {
+                "name": "access_token",
+                "value": "={{ $vars.INSTAGRAM_ACCESS_TOKEN }}"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "node-crear-container",
+        "name": "Crear contenedor Instagram (paso 1)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1100,
+          180
+        ],
+        "notes": "Sube la imagen a Instagram. Devuelve un container ID."
+      },
+      {
+        "parameters": {
+          "amount": 15,
+          "unit": "seconds"
+        },
+        "id": "node-esperar",
+        "name": "Esperar 15 segundos",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1,
+        "position": [
+          1320,
+          180
+        ],
+        "notes": "Instagram necesita tiempo para procesar la imagen antes de publicar"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v19.0/{{ $vars.INSTAGRAM_BUSINESS_ID }}/media_publish",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "creation_id",
+                "value": "={{ $('Crear contenedor Instagram (paso 1)').first().json.id }}"
+              },
+              {
+                "name": "access_token",
+                "value": "={{ $vars.INSTAGRAM_ACCESS_TOKEN }}"
+              }
+            ]
+          },
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "node-publicar",
+        "name": "Publicar en Instagram (paso 2)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1540,
+          180
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "UPDATE mockups_varios SET publicado_instagram = NOW(), veces_usado = veces_usado + 1, ultima_vez_usado = NOW() WHERE id = {{ $('Preparar imagen y caption').first().json.mockup_id }}",
+          "options": {}
+        },
+        "id": "node-marcar",
+        "name": "Marcar mockup publicado en Instagram",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1760,
+          180
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('instagram_post', CONCAT('📸 Instagram: mockup publicado - ', '{{ $('Preparar imagen y caption').first().json.estancia }}', ' (ID: ', '{{ $('Preparar imagen y caption').first().json.mockup_id }}', ')'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif",
+        "name": "Notificación publicación",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1980,
+          180
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('instagram_agotado', '⚠️ Instagram: No quedan mockups sin publicar. Todos ya fueron publicados.', NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-agotado",
+        "name": "Notificación mockups agotados",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          880,
+          420
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "",
+            "name": "MySQL account"
+          }
+        },
+        "notes": "Cuando todos los mockups ya se publicaron, avisa para que añadas más"
+      }
+    ],
+    "connections": {
+      "Publicar 3 veces al día (9h, 15h, 21h)": {
+        "main": [
+          [
+            {
+              "node": "Buscar mockup no publicado en Instagram",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buscar mockup no publicado en Instagram": {
+        "main": [
+          [
+            {
+              "node": "¿Hay mockup disponible?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Hay mockup disponible?": {
+        "main": [
+          [
+            {
+              "node": "Preparar imagen y caption",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Notificación mockups agotados",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Preparar imagen y caption": {
+        "main": [
+          [
+            {
+              "node": "Crear contenedor Instagram (paso 1)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Crear contenedor Instagram (paso 1)": {
+        "main": [
+          [
+            {
+              "node": "Esperar 15 segundos",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Esperar 15 segundos": {
+        "main": [
+          [
+            {
+              "node": "Publicar en Instagram (paso 2)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Publicar en Instagram (paso 2)": {
+        "main": [
+          [
+            {
+              "node": "Marcar mockup publicado en Instagram",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Marcar mockup publicado en Instagram": {
+        "main": [
+          [
+            {
+              "node": "Notificación publicación",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": null,
+    "versionId": "97835d56-0ef1-4c9f-928b-8e4c0470e57d",
+    "activeVersionId": null,
+    "versionCounter": 1,
+    "triggerCount": 0,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:32:03.883Z",
+        "createdAt": "2026-05-06T21:32:03.883Z",
+        "role": "workflow:owner",
+        "workflowId": "47449235-a9bd-43",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  },
+  {
+    "updatedAt": "2026-05-06T22:09:13.362Z",
+    "createdAt": "2026-05-06T21:32:08.137Z",
+    "id": "3fe04f1f-5365-4e",
+    "name": "LinkedIn Publisher Automático - Noxertez",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 12
+              },
+              {
+                "triggerAtHour": 18
+              }
+            ]
+          }
+        },
+        "id": "node-schedule",
+        "name": "Sincronización Web",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          208,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "url": "http://localhost/noxertez/api/linkedin_publish.php?accion=publish_batch",
+          "options": {
+            "timeout": 30000
+          }
+        },
+        "id": "node-http",
+        "name": "Llamar LinkedIn Publisher",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          448,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.publicados }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "node-check-publicados",
+        "name": "¿Se publicó algo?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          672,
+          304
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {},
+            "conditions": [
+              {
+                "leftValue": "={{ $json.errores.length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "gt"
+                }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "node-check-errores",
+        "name": "¿Hay errores?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          880,
+          432
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('linkedin_ok', CONCAT('LinkedIn: ', '{{ $json.publicados }}', ' post(s) publicados correctamente'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif-ok",
+        "name": "Notificación éxito",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          880,
+          192
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO notificaciones (tipo, mensaje, fecha, leida) VALUES ('linkedin_error', CONCAT('ERROR LinkedIn: ', '{{ JSON.stringify($json.errores) }}'), NOW(), 0)",
+          "options": {}
+        },
+        "id": "node-notif-error",
+        "name": "Notificación error",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          368
+        ],
+        "credentials": {
+          "mySql": {
+            "id": "5zs1WElUjUKf6I5G",
+            "name": "MySQL account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "return [{ json: { info: 'Sin posts pendientes en este ciclo' } }];"
+        },
+        "id": "node-nada",
+        "name": "Sin posts pendientes",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1104,
+          512
+        ]
+      }
+    ],
+    "connections": {
+      "Cada 6 horas": {
+        "main": [
+          [
+            {
+              "node": "Llamar LinkedIn Publisher",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Llamar LinkedIn Publisher": {
+        "main": [
+          [
+            {
+              "node": "¿Se publicó algo?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Se publicó algo?": {
+        "main": [
+          [
+            {
+              "node": "Notificación éxito",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "¿Hay errores?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "¿Hay errores?": {
+        "main": [
+          [
+            {
+              "node": "Notificación error",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Sin posts pendientes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Sincronización Web": {
+        "main": [
+          [
+            {
+              "node": "Llamar LinkedIn Publisher",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": {
+      "node:Sincronización Web": {
+        "recurrenceRules": []
+      }
+    },
+    "meta": null,
+    "pinData": {},
+    "versionId": "b03557c3-e0f6-4d00-9bd1-bef850678bd0",
+    "activeVersionId": "b03557c3-e0f6-4d00-9bd1-bef850678bd0",
+    "versionCounter": 7,
+    "triggerCount": 1,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-05-06T21:32:08.140Z",
+        "createdAt": "2026-05-06T21:32:08.140Z",
+        "role": "workflow:owner",
+        "workflowId": "3fe04f1f-5365-4e",
+        "projectId": "7qBa8daKm985dNpE",
+        "project": {
+          "updatedAt": "2026-05-06T21:23:01.681Z",
+          "createdAt": "2026-05-06T21:10:29.380Z",
+          "id": "7qBa8daKm985dNpE",
+          "name": "noxertez noxertez <noxertez@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "creatorId": "11bcd377-76de-422c-8591-bb365f6fbe7b"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": "Version b03557c3",
+      "description": ""
+    }
+  }
+]
