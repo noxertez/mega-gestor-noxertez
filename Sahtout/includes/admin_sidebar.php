@@ -61,6 +61,10 @@ $page_class = $page_class ?? '';
                     <i class="fas fa-truck"></i>
                     <span>Envíos</span>
                 </a>
+                <a class="sidebar-btn <?php echo $page_class === 'email' ? 'active' : ''; ?>" href="<?php echo $base_path; ?>pages/email/index.php" style="border-color:#7c3aed;">
+                    <i class="fas fa-envelope" style="color:#a78bfa;"></i>
+                    <span>Email</span>
+                </a>
             </div>
 
             <!-- SECCIÓN: CATÁLOGO Y DISEÑO -->

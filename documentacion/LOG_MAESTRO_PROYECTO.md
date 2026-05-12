@@ -103,7 +103,7 @@ Centralización de la comunicación entrante para asegurar "Respuesta Cero Perdi
 *Última actualización: 9 de Mayo de 2026 - Versión Atelier 2.0 Activa.*
 
 
-atelier :
+--------------------------------------------atelier --------------------------------------------------------
 # 👑 ATELIER - Documentación Maestra del Ecosistema Noxertez
 
 Este documento representa la memoria técnica y evolutiva del sistema **Atelier** (antes SahtoutCMS). Aquí se registran los procesos, arquitecturas y soluciones desarrolladas durante los últimos meses de colaboración con Antigravity.
@@ -165,7 +165,7 @@ Gestión de activos visuales y presencia en redes sociales.
 2. **Descuento de Stock en 4 Fuentes:** Al aprobar un pedido, el usuario elige si restar de Terminado, Semi, Materiales o marcar como "Fabricación bajo pedido".
 3. **Notificaciones Centralizadas:** El Mega Gestor ahora centraliza avisos de stock bajo, nuevos emails y tareas pendientes del asistente de voz.
 
----
+------------------------------------   animal ---------------------------------------------------
 
 # 🛡️ SESIÓN: ESTABILIZACIÓN Y CONECTIVIDAD (9 de Mayo de 2026)
 
@@ -189,5 +189,86 @@ Tras un reporte de "Sitio no accesible", se realizó una auditoría técnica pro
 - **Robustez del Footer:** En futuras actualizaciones, el footer debería ser agnóstico al estado de la conexión o reabrirla si es necesario, aunque la mejor práctica sigue siendo mantenerla abierta hasta el `render` final.
 
 ---
-*Última actualización: 9 de Mayo de 2026 - Sitio Restablecido y Optimizado.*
+*Última actualización: 11 de Mayo de 2026 - App de Prospección Desplegada.*
 
+---
+
+# 🏢 FASE: PROSPECCIÓN COMERCIAL (Mayo 2026)
+
+## 📊 1. Aplicación Noxertez Prospección
+Se ha desarrollado un sistema independiente para la gestión y captura de leads comerciales (interioristas, arquitectos, influencers).
+
+- **Estructura Técnica:**
+    - **Lenguaje:** PHP 8.0 (XAMPP).
+    - **Base de Datos:** MySQL `noxertez_prospectos`. Autogestionada (creación automática de base de datos desde `config.php`).
+    - **Librerías:** `PhpSpreadsheet 1.30.4`. (Se realizó un downgrade desde la v2.0 para mantener compatibilidad total con PHP 8.0 sin errores de plataforma).
+- **Funcionalidades:**
+    - Importación avanzada de archivos Excel con mapeo dinámico de columnas.
+    - Interfaz Dark Mode premium con sistema de tarjetas y vista de tabla paginada.
+    - Seguimiento comercial visual (notificaciones de fechas de contacto vencidas).
+    - Gestión de estados asíncrona mediante AJAX.
+
+## 🛰️ 2. Infraestructura: El Salto al Dashboard de Cloudflare
+Un hito importante en esta fase ha sido la transición de la gestión de red.
+
+- **De Local a Remoto:** Se ha detectado que el túnel `noxertez-v3` ha pasado a ser un **Managed Tunnel** (gestionado desde el Dashboard de Cloudflare Zero Trust).
+    - *Consecuencia:* Las reglas de `config.yml` local son ignoradas a favor de las configuradas en la nube.
+- **Configuración de Hostnames:**
+    - **prospectos.noxertez.com:** Configurado como **Public Hostname** en el dashboard apuntando a `http://192.168.1.130:80`.
+    - **Lección Crítica:** Al añadir un hostname en el dashboard, si ya existe un registro DNS manual (Tipo Túnel), Cloudflare dará error de conflicto. Se debe borrar el registro DNS manual antes de crear la ruta en el túnel.
+- **Resolución de Conflictos (WARP/VPN):** 
+    - El uso de Cloudflare WARP (1.1.1.1) puede interferir con la resolución de `localhost`. La solución robusta fue apuntar el túnel directamente a la IP privada del servidor (`192.168.1.130`).
+
+## 🛠️ 3. Estabilización de Apache
+- **VirtualHosts en Puerto 80:** Se ha mantenido la arquitectura estándar en el puerto 80 para evitar complicaciones de puertos no estándar (8080/8888) que causaban errores 502/503.
+- **Sincronización:** El proyecto vive en `C:\mis app de noxertez 2\prospecciones\` pero se sincroniza con `C:\xampp\htdocs\prospecciones\` para la ejecución real.
+
+---
+*Documentado por Antigravity - 11 de Mayo de 2026*
+
+Este documento sirve de contexto técnico para el desarrollo del CMS, evitando el uso de credenciales sensibles.
+
+---
+
+## 🚀 Hitos Alcanzados (Abril 2026)
+- **Módulo LinkedIn:** Finalizado y funcional. Incluye redactor dinámico, previsualización de imágenes de productos y gestión de cola de publicaciones.
+- **Módulo Pinterest:** Estructura preparada (Importación + Publicación), a la espera de validación de API.
+- **Seguridad:** Filtrado de sesiones activo en `includes/session.php`. Se requiere `user_id` para acceder a `linkedin.php`.
+- **Limpieza de Sistema:** Eliminación de carpetas duplicadas para unificar el entorno de ejecución en la raíz de XAMPP.
+
+---
+
+## 🚀 Hitos Alcanzados (Mayo 2026)
+- **App de Prospección:** Nueva aplicación web para captación de leads. Incluye importador de Excel con `PhpSpreadsheet`, sistema de tarjetas y CRM ligero.
+- **Infraestructura Cloudflare:** Transición a **Managed Tunnel** vía Dashboard. Configuración del subdominio `prospectos.noxertez.com` apuntando a la IP local del servidor.
+- **Estabilización de Red:** Optimización de la conectividad local para ser compatible con Cloudflare WARP (1.1.1.1).
+
+---
+
+## 📂 Arquitectura de Archivos (XAMPP)
+- **Ruta Principal:** `C:\xampp\htdocs\noxertez\`
+- **Interfaz de Usuario:** `.../pages/` (Contiene `linkedin.php`, `pinterest.php`, `stock.php`).
+- **Endpoints API:** `.../api/` (Contiene lógica de publicación y OAuth).
+- **Configuración DB:** `api/config.php` (Centraliza la conexión a la base de datos).
+
+---
+
+## 🛠️ Detalles Técnicos de Integración
+
+### LinkedIn API
+- **Versión Utilizada:** `202604` (Formato YYYYMM).
+- **Estructura del Post:** Se utiliza el endpoint `/rest/posts`.
+- **Requisitos de JSON:** Es obligatorio incluir el objeto `visibility` y el objeto `distribution` (con `feedDistribution` como `MAIN_FEED`).
+- **Gestión de Imágenes:** Las imágenes deben subirse primero mediante `/rest/images?action=initializeUpload` para obtener una `media_urn`.
+
+### Resolución de Rutas
+- El sistema utiliza `resolverRutaPublica()` (PHP) y `resolverRutaJS()` (JS) para mapear rutas físicas del servidor (donde la aplicación de escritorio guarda las fotos) a URLs web accesibles.
+
+---
+
+## 🔐 Seguridad y Privacidad
+- **Credenciales:** Los Client ID, Secrets y Tokens **NUNCA** deben escribirse en este documento ni en archivos de documentación sincronizados.
+- **Almacenamiento:** Las credenciales se gestionan exclusivamente en la tabla `configuracion` de la base de datos local.
+
+---
+*Documento generado para soporte de IA y control de versiones.*

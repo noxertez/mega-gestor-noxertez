@@ -1,9 +1,13 @@
 tunnel: 8f876cde-5abd-4248-8756-4ae82041ea8d
-credentials-file: c:\mis app de noxertez 2\SahtoutCMS-main\noxertez-v3.json
+credentials-file: "C:\\mis app de noxertez 2\\SahtoutCMS-main\\noxertez-v3.json"
 
 ingress:
   - hostname: noxertez.com
-    service: http://127.0.0.1:80
+    service: http://192.168.1.130:80
+  - hostname: www.noxertez.com
+    service: http://192.168.1.130:80
   - hostname: n8n.noxertez.com
     service: http://127.0.0.1:5678
+  - hostname: prospectos.noxertez.com
+    service: http://192.168.1.130:80
   - service: http_status:404
